@@ -24,7 +24,7 @@ const PERSONAL: NavGroup = {
     { href: "/employee", label: "Dashboard" },
     { href: "/employee/payslips", label: "Pay slips" },
     { href: "/employee/documents", label: "Documents" },
-    { href: "/employee/time-off", label: "Time off", soon: true },
+    { href: "/employee/time-off", label: "Time off" },
   ],
 };
 
@@ -32,8 +32,8 @@ const MANAGER: NavGroup = {
   title: "My team",
   items: [
     { href: "/manager", label: "Team overview" },
-    { href: "/manager/approvals", label: "Approvals", soon: true },
-    { href: "/manager/team", label: "Team", soon: true },
+    { href: "/manager/approvals", label: "Approvals" },
+    { href: "/manager/team", label: "Team" },
     { href: "/manager/shared", label: "Shared files" },
     { href: "/manager/calendar", label: "Calendar", soon: true },
   ],

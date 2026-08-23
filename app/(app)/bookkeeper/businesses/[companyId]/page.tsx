@@ -8,7 +8,7 @@ import { SmartBusinessPayslipUpload } from "@/components/payslips/smart-business
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { countDocumentsByEmployee } from "@/lib/actions/documents";
-import { listCompanyEmployees } from "@/lib/actions/employees";
+import { listCompanyEmployees, listCompanyManagers } from "@/lib/actions/employees";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -33,8 +33,9 @@ export default async function BusinessPage({
 
   if (!company) notFound();
 
-  const [employees, perEmployeeCounts] = await Promise.all([
+  const [employees, managers, perEmployeeCounts] = await Promise.all([
     listCompanyEmployees(companyId),
+    listCompanyManagers(companyId),
     countDocumentsByEmployee(companyId),
   ]);
 
@@ -53,7 +54,11 @@ export default async function BusinessPage({
         description={`Tax ID ${company.tax_id}`}
       />
 
-      <InvitePeoplePanel companyId={company.id} companyName={company.name} />
+      <InvitePeoplePanel
+        companyId={company.id}
+        companyName={company.name}
+        managers={managers.map((row) => ({ id: row.id, fullName: row.fullName }))}
+      />
 
       {employees.length > 0 && (
         <div className="mt-8 space-y-6">
@@ -85,6 +90,9 @@ export default async function BusinessPage({
                       {employee.role === "manager" ? "Manager" : "Employee"}
                       {" · "}ID: {employee.nationalId || employee.employeeNumber}
                       {employee.jobTitle ? ` · ${employee.jobTitle}` : ""}
+                      {employee.managerName
+                        ? ` · Reports to ${employee.managerName}`
+                        : " · No line manager"}
                     </p>
                   </div>
                   <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">

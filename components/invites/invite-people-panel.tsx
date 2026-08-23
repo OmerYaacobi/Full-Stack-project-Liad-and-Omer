@@ -22,9 +22,11 @@ type InviteRow = {
 export function InvitePeoplePanel({
   companyId,
   companyName,
+  managers = [],
 }: {
   companyId: string;
   companyName: string;
+  managers?: { id: string; fullName: string }[];
 }) {
   const [role, setRole] = useState<"employee" | "manager">("employee");
   const [email, setEmail] = useState("");
@@ -33,6 +35,7 @@ export function InvitePeoplePanel({
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [managerId, setManagerId] = useState("");
   const [invites, setInvites] = useState<InviteRow[]>([]);
 
   useEffect(() => {
@@ -57,6 +60,7 @@ export function InvitePeoplePanel({
       role,
       email: email.trim() || undefined,
       expiresInDays,
+      managerId: managerId || undefined,
     });
 
     setPending(false);
@@ -138,6 +142,34 @@ export function InvitePeoplePanel({
             <option value={14}>In 14 days</option>
             <option value={30}>In 30 days</option>
           </select>
+        </div>
+
+        <div className="sm:col-span-2">
+          <label htmlFor="invite-manager" className="block text-sm font-medium text-slate-700">
+            Line manager <span className="text-slate-400">(optional)</span>
+          </label>
+          <select
+            id="invite-manager"
+            value={managerId}
+            onChange={(event) => setManagerId(event.target.value)}
+            disabled={pending || managers.length === 0}
+            className={FIELD}
+          >
+            <option value="">
+              {managers.length === 0
+                ? "Invite a manager first"
+                : "No line manager yet"}
+            </option>
+            {managers.map((manager) => (
+              <option key={manager.id} value={manager.id}>
+                {manager.fullName}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-500">
+            They send time-off requests to this person. You can change it later
+            on their page.
+          </p>
         </div>
 
         {error && (

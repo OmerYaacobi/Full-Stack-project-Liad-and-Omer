@@ -21,6 +21,13 @@ export function monthLabel(month: number): string {
   return MONTHS.find((item) => item.value === month)?.label ?? `Month ${month}`;
 }
 
+function optionalDays() {
+  return z
+    .union([z.coerce.number().min(0).max(365), z.literal("")])
+    .optional()
+    .transform((value) => (value === "" || value === undefined ? null : value));
+}
+
 function optionalMoney(message: string) {
   return z
     .union([z.coerce.number().min(0, message), z.literal("")])
@@ -41,6 +48,8 @@ export const uploadPayslipSchema = z
     grossPay: optionalMoney("Gross pay cannot be negative."),
     netPay: optionalMoney("Net pay cannot be negative."),
     totalDeductions: optionalMoney("Deductions cannot be negative."),
+    vacationDays: optionalDays(),
+    sickDays: optionalDays(),
   })
   .refine((data) => data.netPay <= data.grossPay, {
     message: "Net pay cannot be higher than gross pay.",

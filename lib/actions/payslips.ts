@@ -4,7 +4,7 @@ import { createHash } from "crypto";
 
 import { revalidatePath } from "next/cache";
 
-import { getMyEmployeeId } from "@/lib/actions/employees";
+import { applyPayslipLeaveBalances, getMyEmployeeId } from "@/lib/actions/employees";
 import { fail, fromZod, ok, type ActionResult } from "@/lib/actions/result";
 import { createClient } from "@/lib/supabase/server";
 import { MAX_PAYSLIP_BYTES, uploadPayslipSchema } from "@/lib/validations/payslips";
@@ -38,6 +38,8 @@ export async function uploadPayslip(
     grossPay: formData.get("grossPay") ?? "",
     netPay: formData.get("netPay") ?? "",
     totalDeductions: formData.get("totalDeductions") ?? "",
+    vacationDays: formData.get("vacationDays") ?? "",
+    sickDays: formData.get("sickDays") ?? "",
   });
   if (!parsed.success) return fromZod(parsed.error);
 
@@ -66,6 +68,8 @@ export async function uploadPayslip(
     grossPay,
     netPay,
     totalDeductions,
+    vacationDays,
+    sickDays,
   } = parsed.data;
 
   const periodId = await ensurePeriod(supabase, companyId, year, month);
@@ -134,6 +138,19 @@ export async function uploadPayslip(
 
   revalidateEmployeePayslips(companyId, employeeId);
   revalidatePath("/manager/shared");
+  revalidatePath("/employee/time-off");
+  revalidatePath("/employee");
+
+  await applyPayslipLeaveBalances({
+    companyId,
+    employeeId,
+    year,
+    month,
+    vacationDays,
+    sickDays,
+    actorId: user.id,
+  });
+
   return ok(undefined);
 }
 

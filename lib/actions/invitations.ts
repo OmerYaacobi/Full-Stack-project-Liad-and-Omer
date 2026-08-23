@@ -27,6 +27,26 @@ export async function createInvitationLink(input: CreateInvitationInput) {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
+  let managerId: string | null = parsed.data.managerId ? parsed.data.managerId : null;
+  if (managerId) {
+    const { data: manager } = await supabase
+      .from("employees")
+      .select("id, company_id, memberships(role)")
+      .eq("id", managerId)
+      .maybeSingle();
+    const memberships = manager?.memberships as
+      | { role?: string }
+      | { role?: string }[]
+      | null
+      | undefined;
+    const role = Array.isArray(memberships)
+      ? memberships[0]?.role
+      : memberships?.role;
+    if (!manager || manager.company_id !== parsed.data.companyId || role !== "manager") {
+      return { ok: false, error: "Pick a manager who already works at this business." };
+    }
+  }
+
   const { data: invitation, error } = await supabase
     .from("invitations")
     .insert({
@@ -35,11 +55,18 @@ export async function createInvitationLink(input: CreateInvitationInput) {
       email: parsed.data.email || null,
       created_by: user.id,
       expires_at: expiresAt.toISOString(),
+      manager_id: managerId,
     })
     .select("id, token, role, company_id, expires_at")
     .single();
 
   if (error) {
+    if (/manager_id/i.test(error.message)) {
+      return {
+        ok: false,
+        error: "This database is missing the line-manager column. Run 0004_time_off.sql in Supabase.",
+      };
+    }
     return { ok: false, error: error.message };
   }
 

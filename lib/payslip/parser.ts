@@ -7,6 +7,8 @@ export interface ParsedPayslipData {
   period_month: number | null;
   period_year: number | null;
   currency: string;
+  vacation_days: number | null;
+  sick_days: number | null;
 }
 
 export interface ParsedPayslipConfidence {
@@ -16,6 +18,8 @@ export interface ParsedPayslipConfidence {
   gross_pay_found?: boolean;
   deductions_found?: boolean;
   period_found?: boolean;
+  vacation_found?: boolean;
+  sick_found?: boolean;
 }
 
 export interface ParsedPayslipResponse {
@@ -458,10 +462,434 @@ export function extractPeriod(
   return { month: null, year: null };
 }
 
+const VACATION_PAY = /דמי\s*חופשה|פדיון\s*חופשה|פדיון/;
+const SICK_PAY = /דמי\s*מחלה/;
+const LEAVE_NOISE = /צבירת?|ניצול|דמי|פדיון|הבראה|מילואים|opening|accrual/;
+
+export type PdfTextItem = {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+};
+
+function hasVacationLabel(text: string): boolean {
+  if (VACATION_PAY.test(text)) return false;
+  return /חופש|vacation|annual\s*leave|השפוח|שפוח/.test(text);
+}
+
+function hasSickLabel(text: string): boolean {
+  if (SICK_PAY.test(text)) return false;
+  return /מחלה|sick\s*(?:days?|leave)|\bsick\b|הלחמ/.test(text);
+}
+
+function isLeaveMovementRow(text: string): boolean {
+  return /פתיחה|קודמת|ניצול|צבירה|נוצל|נצבר|opening|accrual/.test(text);
+}
+
+function isClosingBalanceHeader(text: string): boolean {
+  const t = normalizeTextLine(text);
+  if (!t || LEAVE_NOISE.test(t) || isLeaveMovementRow(t)) return false;
+  if (hasVacationLabel(t) || hasSickLabel(t)) return false;
+  return t
+    .split(/\s+/)
+    .some((token) => /^(יתרה|יתרת|remaining|balance|הרתי)$/i.test(token));
+}
+
+function isTypeRowLabel(text: string, kind: "vacation" | "sick"): boolean {
+  if (LEAVE_NOISE.test(text) || VACATION_PAY.test(text) || SICK_PAY.test(text)) {
+    return false;
+  }
+  if (kind === "vacation") return hasVacationLabel(text) && !hasSickLabel(text);
+  return hasSickLabel(text) && !hasVacationLabel(text);
+}
+
+/** Day counts only — do not reuse salary parseAmount, which reverses some decimals. */
+function parseLeaveDays(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (/^\d{1,3},\d{3}/.test(trimmed)) return null;
+  const clean = trimmed.replace(/,/g, ".");
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(clean)) return null;
+  const value = Number(clean);
+  if (!Number.isFinite(value) || value < 0 || value > 180) return null;
+  if (isProbableYear(value)) return null;
+  return Math.round(value * 100) / 100;
+}
+
+function dayNumbersIn(text: string): number[] {
+  const matches = text.match(/\d{1,3}(?:[.,]\d{1,2})?/g) ?? [];
+  return matches
+    .map(parseLeaveDays)
+    .filter((value): value is number => value !== null);
+}
+
+function itemCenterX(item: PdfTextItem): number {
+  return item.x + item.width / 2;
+}
+
+function mergeRowWords(row: PdfTextItem[]): PdfTextItem[] {
+  const merged: PdfTextItem[] = [];
+  for (const item of row) {
+    const prev = merged[merged.length - 1];
+    const gap = prev ? item.x - (prev.x + prev.width) : Infinity;
+    const prevNumeric = Boolean(prev && /^\d/.test(prev.text));
+    const currentNumeric = /^\d/.test(item.text);
+    if (prev && gap < 4.5 && !(prevNumeric || currentNumeric)) {
+      prev.text += item.text;
+      prev.width = Math.max(prev.width, item.x + item.width - prev.x);
+    } else {
+      merged.push({ ...item });
+    }
+  }
+  return merged;
+}
+
+function clusterRows(items: PdfTextItem[], yTol = 8): PdfTextItem[][] {
+  const sorted = [...items].sort((a, b) => b.y - a.y || a.x - b.x);
+  const rows: PdfTextItem[][] = [];
+  for (const item of sorted) {
+    const row = rows.find((candidate) => Math.abs(candidate[0].y - item.y) <= yTol);
+    if (row) row.push(item);
+    else rows.push([item]);
+  }
+  return rows.map((row) => mergeRowWords([...row].sort((a, b) => a.x - b.x)));
+}
+
+function collectLabels(
+  rows: PdfTextItem[][],
+  kind: "vacation" | "sick",
+): PdfTextItem[] {
+  const found: PdfTextItem[] = [];
+  for (const row of rows) {
+    for (const cell of row) {
+      const text = normalizeTextLine(cell.text);
+      if (!isTypeRowLabel(text, kind)) continue;
+      if (dayNumbersIn(text).length > 0) continue;
+      found.push({ ...cell, text, y: row[0].y });
+    }
+  }
+  return found;
+}
+
+function closestPair(
+  vacations: PdfTextItem[],
+  sicks: PdfTextItem[],
+): { vacation: PdfTextItem; sick: PdfTextItem } | null {
+  let best: { vacation: PdfTextItem; sick: PdfTextItem; dist: number } | null = null;
+  for (const vacation of vacations) {
+    for (const sick of sicks) {
+      const dist = Math.hypot(vacation.x - sick.x, vacation.y - sick.y);
+      if (dist === 0) continue;
+      if (!best || dist < best.dist) best = { vacation, sick, dist };
+    }
+  }
+  return best;
+}
+
+function numberCells(rows: PdfTextItem[][]): PdfTextItem[] {
+  const cells: PdfTextItem[] = [];
+  for (const row of rows) {
+    for (const cell of row) {
+      const text = normalizeTextLine(cell.text);
+      if (hasVacationLabel(text) || hasSickLabel(text) || LEAVE_NOISE.test(text)) {
+        continue;
+      }
+      const value = parseLeaveDays(text);
+      if (value === null) continue;
+      cells.push({ ...cell, text: String(value), y: row[0].y });
+    }
+  }
+  return cells;
+}
+
+function valueAtIntersection(
+  numbers: PdfTextItem[],
+  columnX: number,
+  rowY: number,
+  xTol: number,
+  yTol: number,
+): number | null {
+  let best: { score: number; value: number } | null = null;
+  for (const cell of numbers) {
+    const dx = Math.abs(itemCenterX(cell) - columnX);
+    const dy = Math.abs(cell.y - rowY);
+    if (dx > xTol || dy > yTol) continue;
+    const value = Number(cell.text);
+    const score = dx + dy * 2;
+    if (!best || score < best.score) best = { score, value };
+  }
+  return best ? best.value : null;
+}
+
+function clusterColumnCenters(xs: number[], xTol: number): number[] {
+  const sorted = [...xs].sort((a, b) => a - b);
+  const groups: number[][] = [];
+  for (const x of sorted) {
+    const group = groups[groups.length - 1];
+    if (group && Math.abs(group[group.length - 1] - x) <= xTol) group.push(x);
+    else groups.push([x]);
+  }
+  return groups.map((group) => group.reduce((sum, x) => sum + x, 0) / group.length);
+}
+
+/**
+ * חופש and מחלה are rows; יתרה is a column. Read the cell at each intersection.
+ */
+export function extractLeaveBalancesFromGrid(
+  items: PdfTextItem[],
+): { vacationDays: number | null; sickDays: number | null } {
+  const usable = items
+    .map((item) => ({
+      ...item,
+      text: normalizeTextLine(decodeSwappedPdfText(item.text)),
+    }))
+    .filter((item) => item.text.length > 0);
+  if (usable.length === 0) {
+    return { vacationDays: null, sickDays: null };
+  }
+
+  const rows = clusterRows(usable);
+  const pair = closestPair(collectLabels(rows, "vacation"), collectLabels(rows, "sick"));
+  if (!pair) return { vacationDays: null, sickDays: null };
+
+  const numbers = numberCells(rows);
+  const rowGap = Math.abs(pair.vacation.y - pair.sick.y);
+  const colGap = Math.abs(pair.vacation.x - pair.sick.x);
+  const typesAreRows = colGap <= rowGap;
+  const yTol = Math.max(5, (typesAreRows ? rowGap : colGap) * 0.4);
+  const xTol = Math.max(14, (typesAreRows ? Math.max(rowGap, 24) : colGap) * 0.45);
+
+  const headers: PdfTextItem[] = [];
+  for (const row of rows) {
+    for (const cell of row) {
+      if (isClosingBalanceHeader(normalizeTextLine(cell.text))) {
+        headers.push({ ...cell, y: row[0].y });
+      }
+    }
+  }
+
+  const midX = (pair.vacation.x + pair.sick.x) / 2;
+  const midY = (pair.vacation.y + pair.sick.y) / 2;
+  const tableSpan = Math.max(rowGap, colGap, 36) * 10;
+  const yitra = headers
+    .map((header) => ({
+      header,
+      dist: Math.hypot(itemCenterX(header) - midX, header.y - midY),
+      away: Math.abs(itemCenterX(header) - midX),
+    }))
+    .filter((entry) => entry.dist <= tableSpan)
+    .sort((a, b) => b.away - a.away || a.dist - b.dist)[0]?.header;
+
+  const remainingX = yitra ? itemCenterX(yitra) : null;
+  const remainingY = yitra ? yitra.y : null;
+
+  if (typesAreRows) {
+    const columnX =
+      remainingX ??
+      pickRemainingColumnX(numbers, pair.vacation, pair.sick, yTol, xTol);
+    if (columnX === null) return { vacationDays: null, sickDays: null };
+    const columnTol = remainingX !== null ? Math.max(10, Math.min(xTol, 22)) : xTol;
+    return {
+      vacationDays: valueAtIntersection(numbers, columnX, pair.vacation.y, columnTol, yTol),
+      sickDays: valueAtIntersection(numbers, columnX, pair.sick.y, columnTol, yTol),
+    };
+  }
+
+  const rowY =
+    remainingY ??
+    pickRemainingRowY(numbers, pair.vacation, pair.sick, xTol, yTol);
+  if (rowY === null) return { vacationDays: null, sickDays: null };
+  return {
+    vacationDays: valueAtIntersection(numbers, itemCenterX(pair.vacation), rowY, xTol, yTol),
+    sickDays: valueAtIntersection(numbers, itemCenterX(pair.sick), rowY, xTol, yTol),
+  };
+}
+
+function pickRemainingRowY(
+  numbers: PdfTextItem[],
+  vacation: PdfTextItem,
+  sick: PdfTextItem,
+  xTol: number,
+  yTol: number,
+): number | null {
+  const labelY = (vacation.y + sick.y) / 2;
+  const xMin = Math.min(vacation.x, sick.x) - xTol;
+  const xMax = Math.max(vacation.x, sick.x) + xTol;
+  const nearby = numbers.filter(
+    (cell) =>
+      itemCenterX(cell) >= xMin &&
+      itemCenterX(cell) <= xMax &&
+      Math.abs(cell.y - labelY) > 8,
+  );
+  if (nearby.length === 0) return null;
+
+  const centers = clusterColumnCenters(
+    nearby.map((cell) => cell.y),
+    Math.max(8, yTol),
+  );
+
+  let best: { y: number; score: number } | null = null;
+  for (const rowY of centers) {
+    const vacationValue = valueAtIntersection(
+      nearby,
+      itemCenterX(vacation),
+      rowY,
+      xTol,
+      yTol,
+    );
+    const sickValue = valueAtIntersection(nearby, itemCenterX(sick), rowY, xTol, yTol);
+    if (vacationValue === null && sickValue === null) continue;
+    const filled = Number(vacationValue !== null) + Number(sickValue !== null);
+    const differed =
+      vacationValue !== null && sickValue !== null && vacationValue !== sickValue;
+    const score = filled * 40 + (differed ? 15 : 0);
+    if (!best || score > best.score) best = { y: rowY, score };
+  }
+  return best?.y ?? null;
+}
+
+function pickRemainingColumnX(
+  numbers: PdfTextItem[],
+  vacation: PdfTextItem,
+  sick: PdfTextItem,
+  yTol: number,
+  xTol: number,
+): number | null {
+  const labelX = (vacation.x + sick.x) / 2;
+  const yMin = Math.min(vacation.y, sick.y) - yTol;
+  const yMax = Math.max(vacation.y, sick.y) + yTol;
+  const nearby = numbers.filter(
+    (cell) =>
+      cell.y >= yMin &&
+      cell.y <= yMax &&
+      Math.abs(itemCenterX(cell) - labelX) > 12,
+  );
+  if (nearby.length === 0) return null;
+
+  const centers = clusterColumnCenters(
+    nearby.map(itemCenterX),
+    Math.max(10, xTol),
+  );
+
+  let best: { x: number; score: number } | null = null;
+  for (const columnX of centers) {
+    const vacationValue = valueAtIntersection(nearby, columnX, vacation.y, xTol, yTol);
+    const sickValue = valueAtIntersection(nearby, columnX, sick.y, xTol, yTol);
+    if (vacationValue === null && sickValue === null) continue;
+    const filled = Number(vacationValue !== null) + Number(sickValue !== null);
+    const differed = vacationValue !== null && sickValue !== null && vacationValue !== sickValue;
+    const awayFromLabels = Math.abs(columnX - labelX);
+    const score = filled * 40 + (differed ? 15 : 0) + awayFromLabels / 20;
+    if (!best || score > best.score) best = { x: columnX, score };
+  }
+  return best?.x ?? null;
+}
+
+function coalesceHeaderTokens(tokens: string[]): string[] {
+  const grouped: string[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const current = tokens[i];
+    const next = tokens[i + 1];
+    if (/^יתרת?$/.test(current) && next && /^(פתיחה|קודמת|חדשה|סגירה)$/.test(next)) {
+      grouped.push(`${current} ${next}`);
+      i += 1;
+    } else {
+      grouped.push(current);
+    }
+  }
+  return grouped;
+}
+
+function remainingColumnIndex(tokens: string[]): number | null {
+  const grouped = coalesceHeaderTokens(tokens);
+  let last: number | null = null;
+  for (let i = 0; i < grouped.length; i++) {
+    if (isClosingBalanceHeader(grouped[i])) last = i;
+  }
+  return last;
+}
+
+function tokenAtLeaveCell(tokens: string[], columnIndex: number): number | null {
+  if (columnIndex >= 0 && columnIndex < tokens.length) {
+    const direct = parseLeaveDays(tokens[columnIndex]);
+    if (direct !== null) return direct;
+  }
+  const numbers = tokens
+    .map((token) => parseLeaveDays(token))
+    .filter((value): value is number => value !== null);
+  const labelOffset = tokens.length - numbers.length;
+  const numberIndex = columnIndex - (labelOffset > 0 && columnIndex >= labelOffset ? labelOffset : 0);
+  return numbers[numberIndex] ?? numbers[columnIndex] ?? null;
+}
+
+function extractLeaveTableFromLines(
+  lines: string[],
+): { vacationDays: number | null; sickDays: number | null } {
+  const normalized = lines.map((line) => normalizeTextLine(line)).filter(Boolean);
+
+  for (let i = 0; i < normalized.length; i++) {
+    const headerTokens = coalesceHeaderTokens(normalized[i].split(/\s+/).filter(Boolean));
+    const columnIndex = remainingColumnIndex(headerTokens);
+    if (columnIndex === null) continue;
+
+    let vacationDays: number | null = null;
+    let sickDays: number | null = null;
+    for (let j = i + 1; j <= i + 10 && j < normalized.length; j++) {
+      const row = normalized[j];
+      const tokens = coalesceHeaderTokens(row.split(/\s+/).filter(Boolean));
+      if (tokens.length === 0) continue;
+      const vacation = isTypeRowLabel(row, "vacation");
+      const sick = isTypeRowLabel(row, "sick");
+      if (vacation === sick) continue;
+      const value = tokenAtLeaveCell(tokens, columnIndex);
+      if (value === null) continue;
+      if (vacation) vacationDays = value;
+      if (sick) sickDays = value;
+    }
+    if (vacationDays !== null || sickDays !== null) {
+      return { vacationDays, sickDays };
+    }
+  }
+
+  let vacationDays: number | null = null;
+  let sickDays: number | null = null;
+  for (const line of normalized) {
+    const vacation = isTypeRowLabel(line, "vacation");
+    const sick = isTypeRowLabel(line, "sick");
+    if (vacation === sick) continue;
+    const numbers = dayNumbersIn(line);
+    if (numbers.length === 0) continue;
+    const value = numbers[numbers.length - 1];
+    if (vacation && vacationDays === null) vacationDays = value;
+    if (sick && sickDays === null) sickDays = value;
+  }
+  return { vacationDays, sickDays };
+}
+
+/**
+ * Remaining vacation = row חופש × column יתרה.
+ * Remaining sick = row מחלה × the same יתרה column.
+ */
+export function extractLeaveBalances(
+  _text: string,
+  lines: string[],
+  items?: PdfTextItem[],
+): { vacationDays: number | null; sickDays: number | null } {
+  if (items && items.length > 0) {
+    const fromGrid = extractLeaveBalancesFromGrid(items);
+    if (fromGrid.vacationDays !== null || fromGrid.sickDays !== null) {
+      return fromGrid;
+    }
+  }
+  return extractLeaveTableFromLines(lines);
+}
+
 /**
  * Extracts text using pdfjs-dist with built-in CMap and font decoding.
  */
-async function extractWithPdfJs(pdfBuffer: Buffer): Promise<string> {
+async function extractWithPdfJsLayout(
+  pdfBuffer: Buffer,
+): Promise<{ text: string; items: PdfTextItem[] }> {
   try {
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
     try {
@@ -478,6 +906,7 @@ async function extractWithPdfJs(pdfBuffer: Buffer): Promise<string> {
     });
     const doc = await loadingTask.promise;
     let fullText = "";
+    const items: PdfTextItem[] = [];
 
     for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
       const page = await doc.getPage(pageNum);
@@ -487,72 +916,90 @@ async function extractWithPdfJs(pdfBuffer: Buffer): Promise<string> {
 
       for (const item of textContent.items as any[]) {
         if (!item.str) continue;
-        if (lastY !== null && Math.abs(item.transform[5] - lastY) > 4) {
+        const x = Number(item.transform?.[4] ?? 0);
+        const y = Number(item.transform?.[5] ?? 0);
+        const width = Number(item.width ?? Math.max(4, String(item.str).length * 4));
+        items.push({ text: String(item.str), x, y, width });
+        if (lastY !== null && Math.abs(y - lastY) > 4) {
           pageText += "\n";
         } else if (pageText.length > 0 && !pageText.endsWith("\n") && !pageText.endsWith(" ")) {
           pageText += " ";
         }
         pageText += item.str;
-        lastY = item.transform[5];
+        lastY = y;
       }
 
       fullText += pageText + "\n";
     }
 
-    return fullText;
+    return { text: fullText, items };
   } catch (err) {
     console.warn("PDFJS extraction error:", err);
-    return "";
+    return { text: "", items: [] };
   }
 }
 
 /**
  * Extracts clean decoded Hebrew text from pdf2json page structures.
  */
-function extractWithPdf2Json(pdfBuffer: Buffer): Promise<string> {
+function extractWithPdf2JsonLayout(
+  pdfBuffer: Buffer,
+): Promise<{ text: string; items: PdfTextItem[] }> {
   return new Promise((resolve) => {
     try {
       const PDFParser = require("pdf2json");
       const parser = new PDFParser(null, 1);
 
-      parser.on("pdfParser_dataError", () => resolve(""));
+      parser.on("pdfParser_dataError", () => resolve({ text: "", items: [] }));
       parser.on("pdfParser_dataReady", (pdfData: any) => {
         try {
           let fullText = "";
+          const items: PdfTextItem[] = [];
           if (pdfData && pdfData.Pages) {
             for (const page of pdfData.Pages) {
               if (!page.Texts) continue;
               let lastY: number | null = null;
               for (const textItem of page.Texts) {
                 const y = textItem.y;
+                const x = textItem.x;
                 if (lastY !== null && Math.abs(y - lastY) > 0.3) {
                   fullText += "\n";
                 } else if (fullText.length > 0 && !fullText.endsWith("\n") && !fullText.endsWith(" ")) {
                   fullText += " ";
                 }
+                let piece = "";
                 if (textItem.R) {
                   for (const r of textItem.R) {
                     try {
-                      fullText += decodeURIComponent(r.T || "");
+                      piece += decodeURIComponent(r.T || "");
                     } catch {
-                      fullText += r.T || "";
+                      piece += r.T || "";
                     }
                   }
                 }
+                if (piece) {
+                  items.push({
+                    text: piece,
+                    x: Number(x ?? 0) * 10,
+                    y: Number(y ?? 0) * 10,
+                    width: Number(textItem.w ?? Math.max(0.4, piece.length * 0.4)) * 10,
+                  });
+                }
+                fullText += piece;
                 lastY = y;
               }
               fullText += "\n";
             }
           }
-          resolve(fullText);
+          resolve({ text: fullText, items });
         } catch {
-          resolve("");
+          resolve({ text: "", items: [] });
         }
       });
 
       parser.parseBuffer(pdfBuffer);
     } catch {
-      resolve("");
+      resolve({ text: "", items: [] });
     }
   });
 }
@@ -560,18 +1007,26 @@ function extractWithPdf2Json(pdfBuffer: Buffer): Promise<string> {
 /**
  * Extracts raw text from a PDF buffer with multi-engine fallback and byte-swap normalization.
  */
-async function extractRawPdfText(pdfBuffer: Buffer): Promise<string> {
-  let rawText = await extractWithPdfJs(pdfBuffer);
+async function extractPdfLayout(
+  pdfBuffer: Buffer,
+): Promise<{ text: string; items: PdfTextItem[] }> {
+  let layout = await extractWithPdfJsLayout(pdfBuffer);
 
-  if (!rawText || rawText.trim().length < 30) {
-    rawText = await extractWithPdf2Json(pdfBuffer);
+  if (!layout.text || layout.text.trim().length < 30) {
+    layout = await extractWithPdf2JsonLayout(pdfBuffer);
   }
 
-  if (rawText && rawText.length > 0) {
-    rawText = decodeSwappedPdfText(rawText);
+  if (layout.text) {
+    layout = {
+      text: decodeSwappedPdfText(layout.text),
+      items: layout.items.map((item) => ({
+        ...item,
+        text: decodeSwappedPdfText(item.text),
+      })),
+    };
   }
 
-  return rawText || "";
+  return layout;
 }
 
 /**
@@ -586,7 +1041,7 @@ export async function parseDigitalPayslipPdf(
   filename?: string
 ): Promise<ParsedPayslipResponse> {
   try {
-    const rawText = await extractRawPdfText(pdfBuffer);
+    const { text: rawText, items } = await extractPdfLayout(pdfBuffer);
 
     console.log("=== PAYSIP PDF PARSE DEBUG ===");
     console.log("Extracted raw text length:", rawText.length);
@@ -603,6 +1058,8 @@ export async function parseDigitalPayslipPdf(
     const employeeId = extractEmployeeId(rawText, lines, filename);
     const employeeName = extractEmployeeName(rawText, lines);
     const period = extractPeriod(rawText, lines, filename);
+    const leave = extractLeaveBalances(rawText, lines, items);
+    console.log("Leave table (row × יתרה):", leave);
 
     // 2. Direct Explicit Label Extraction (Highest Priority)
     let netPay = extractNetPayFromLabels(rawText, lines);
@@ -642,7 +1099,9 @@ export async function parseDigitalPayslipPdf(
       employeeName !== null ||
       netPay !== null ||
       period.month !== null ||
-      period.year !== null;
+      period.year !== null ||
+      leave.vacationDays !== null ||
+      leave.sickDays !== null;
 
     if (alphanumericCount < 20 && !hasAnyExtractedData) {
       return {
@@ -662,6 +1121,8 @@ export async function parseDigitalPayslipPdf(
         period_month: period.month,
         period_year: period.year,
         currency: "ILS",
+        vacation_days: leave.vacationDays,
+        sick_days: leave.sickDays,
       },
       confidence: {
         name_found: employeeName !== null,
@@ -670,6 +1131,8 @@ export async function parseDigitalPayslipPdf(
         gross_pay_found: grossPay !== null,
         deductions_found: totalDeductions !== null,
         period_found: period.month !== null && period.year !== null,
+        vacation_found: leave.vacationDays !== null,
+        sick_found: leave.sickDays !== null,
       },
     };
   } catch (error: any) {

@@ -6,6 +6,7 @@ import { uploadPayslip } from "@/lib/actions/payslips";
 import type { CompanyEmployee } from "@/lib/actions/employees";
 import { parsePayslipAction } from "@/lib/actions/parse-payslip";
 import { ShareWithManagersField } from "@/components/shared/share-with-managers-field";
+import { PayslipLeaveFields } from "@/components/payslips/payslip-leave-fields";
 import { MONTHS } from "@/lib/validations/payslips";
 
 const FIELD_CLASSES =
@@ -35,6 +36,8 @@ export function PayslipUploadForm({
   const [grossPay, setGrossPay] = useState<string>("");
   const [netPay, setNetPay] = useState<string>("");
   const [totalDeductions, setTotalDeductions] = useState<string>("");
+  const [vacationDays, setVacationDays] = useState<string>("");
+  const [sickDays, setSickDays] = useState<string>("");
 
   // Parsing status state
   const [isParsing, setIsParsing] = useState(false);
@@ -54,6 +57,8 @@ export function PayslipUploadForm({
       setGrossPay("");
       setNetPay("");
       setTotalDeductions("");
+      setVacationDays("");
+      setSickDays("");
       setParseNotice(null);
     }
   }, [state]);
@@ -72,7 +77,7 @@ export function PayslipUploadForm({
       const res = await parsePayslipAction(formData);
 
       if (res.success && res.data) {
-        const { net_pay, gross_pay, total_deductions, period_month, period_year, employee_name, employee_id } = res.data;
+        const { net_pay, gross_pay, total_deductions, period_month, period_year, employee_name, employee_id, vacation_days, sick_days } = res.data;
 
         const filledFields: string[] = [];
 
@@ -93,6 +98,14 @@ export function PayslipUploadForm({
         }
         if (period_year !== null && period_year !== undefined) {
           setYear(period_year);
+        }
+        if (vacation_days !== null && vacation_days !== undefined) {
+          setVacationDays(String(vacation_days));
+          filledFields.push(`Vacation: ${vacation_days} days`);
+        }
+        if (sick_days !== null && sick_days !== undefined) {
+          setSickDays(String(sick_days));
+          filledFields.push(`Sick: ${sick_days} days`);
         }
 
         let detailText = "";
@@ -303,6 +316,14 @@ export function PayslipUploadForm({
           />
           <FieldError messages={fieldErrors?.totalDeductions} />
         </div>
+
+        <PayslipLeaveFields
+          vacationDays={vacationDays}
+          sickDays={sickDays}
+          onVacationChange={setVacationDays}
+          onSickChange={setSickDays}
+          disabled={pending}
+        />
 
         <ShareWithManagersField disabled={pending} />
       </div>

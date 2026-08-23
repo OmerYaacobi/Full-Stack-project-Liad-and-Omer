@@ -6,6 +6,7 @@ import { uploadPayslip } from "@/lib/actions/payslips";
 import type { CompanyEmployee } from "@/lib/actions/employees";
 import { parsePayslipAction } from "@/lib/actions/parse-payslip";
 import { ShareWithManagersField } from "@/components/shared/share-with-managers-field";
+import { PayslipLeaveFields } from "@/components/payslips/payslip-leave-fields";
 import { MONTHS } from "@/lib/validations/payslips";
 
 const FIELD_CLASSES =
@@ -39,6 +40,8 @@ export function SmartBusinessPayslipUpload({
   const [grossPay, setGrossPay] = useState<string>("");
   const [netPay, setNetPay] = useState<string>("");
   const [totalDeductions, setTotalDeductions] = useState<string>("");
+  const [vacationDays, setVacationDays] = useState<string>("");
+  const [sickDays, setSickDays] = useState<string>("");
   const [extractedId, setExtractedId] = useState<string | null>(null);
   const [extractedName, setExtractedName] = useState<string | null>(null);
 
@@ -62,6 +65,8 @@ export function SmartBusinessPayslipUpload({
       setGrossPay("");
       setNetPay("");
       setTotalDeductions("");
+      setVacationDays("");
+      setSickDays("");
       setExtractedId(null);
       setExtractedName(null);
       setParseError(null);
@@ -86,13 +91,15 @@ export function SmartBusinessPayslipUpload({
       const res = await parsePayslipAction(formData);
 
       if (res.success && res.data) {
-        const { net_pay, gross_pay, total_deductions, period_month, period_year, employee_id, employee_name } = res.data;
+        const { net_pay, gross_pay, total_deductions, period_month, period_year, employee_id, employee_name, vacation_days, sick_days } = res.data;
 
         if (net_pay !== null && net_pay !== undefined) setNetPay(String(net_pay));
         if (gross_pay !== null && gross_pay !== undefined) setGrossPay(String(gross_pay));
         if (total_deductions !== null && total_deductions !== undefined) setTotalDeductions(String(total_deductions));
         if (period_month !== null && period_month !== undefined) setMonth(period_month);
         if (period_year !== null && period_year !== undefined) setYear(period_year);
+        if (vacation_days !== null && vacation_days !== undefined) setVacationDays(String(vacation_days));
+        if (sick_days !== null && sick_days !== undefined) setSickDays(String(sick_days));
         if (employee_id) setExtractedId(employee_id);
         if (employee_name) setExtractedName(employee_name);
 
@@ -368,6 +375,17 @@ export function SmartBusinessPayslipUpload({
                   <p className="text-xs text-red-600 mt-1">{fieldErrors.netPay[0]}</p>
                 )}
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <PayslipLeaveFields
+                vacationDays={vacationDays}
+                sickDays={sickDays}
+                onVacationChange={setVacationDays}
+                onSickChange={setSickDays}
+                disabled={pending}
+                compact
+              />
             </div>
 
             <div className="pt-2">

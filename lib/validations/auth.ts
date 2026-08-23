@@ -133,6 +133,9 @@ export const createInvitationSchema = z.object({
   }),
   email: z.string().trim().email({ message: "Invalid email" }).optional().or(z.literal("")),
   expiresInDays: z.number().min(1).max(30).default(7),
+  managerId: z
+    .union([z.string().uuid(), z.literal("")])
+    .optional(),
 });
 
-export type CreateInvitationInput = z.infer<typeof createInvitationSchema>;
+export type CreateInvitationInput = z.input<typeof createInvitationSchema>;

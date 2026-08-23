@@ -2,13 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AssignManagerForm } from "@/components/employees/assign-manager-form";
 import { DocumentFolder } from "@/components/documents/document-folder";
 import { DocumentUploadForm } from "@/components/documents/document-upload-form";
 import { PayslipList } from "@/components/payslips/payslip-list";
 import { PayslipUploadForm } from "@/components/payslips/payslip-upload-form";
 import { PageHeader } from "@/components/shared/page-header";
 import { listCompanyDocuments } from "@/lib/actions/documents";
-import { getCompanyEmployee } from "@/lib/actions/employees";
+import {
+  ensureEmployeeEntitlements,
+  getCompanyEmployee,
+  listCompanyManagers,
+} from "@/lib/actions/employees";
 import { listEmployeePayslips } from "@/lib/actions/payslips";
 import { createClient } from "@/lib/supabase/server";
 import { DOCUMENT_KINDS } from "@/lib/validations/documents";
@@ -25,12 +30,15 @@ export default async function EmployeeDocumentsPage({
   const { companyId, employeeId } = await params;
 
   const supabase = await createClient();
-  const [{ data: company }, employee] = await Promise.all([
+  const [{ data: company }, employee, managers] = await Promise.all([
     supabase.from("companies").select("id, name").eq("id", companyId).maybeSingle(),
     getCompanyEmployee(companyId, employeeId),
+    listCompanyManagers(companyId),
   ]);
 
   if (!company || !employee) notFound();
+
+  await ensureEmployeeEntitlements(companyId, employeeId, employee.startDate);
 
   const [documents, payslips] = await Promise.all([
     listCompanyDocuments(companyId, employeeId),
@@ -67,7 +75,15 @@ export default async function EmployeeDocumentsPage({
           .join(" · ")}
       />
 
-      <PayslipUploadForm companyId={companyId} employee={employee} />
+      <AssignManagerForm
+        companyId={companyId}
+        employee={employee}
+        managers={managers}
+      />
+
+      <div className="mt-8">
+        <PayslipUploadForm companyId={companyId} employee={employee} />
+      </div>
 
       <div className="mt-8 space-y-4">
         <h2 className="text-sm font-medium text-slate-900">Pay slips</h2>
