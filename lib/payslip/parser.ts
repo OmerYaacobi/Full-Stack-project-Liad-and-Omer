@@ -26,6 +26,49 @@ export interface ParsedPayslipResponse {
 }
 
 /**
+ * Normalizes byte-swapped UTF-16 / CID font characters emitted by legacy Israeli PDF generators.
+ */
+export function decodeSwappedPdfText(text: string): string {
+  let out = "";
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+
+    // 1. Hangul Jamo glyphs mapped to digits (e.g. 0x1100 = '1')
+    if (code === 0x1100) {
+      out += "1";
+    } else if (code >= 0x1101 && code <= 0x1109) {
+      out += String.fromCharCode(0x31 + (code - 0x1100));
+    }
+    // 2. Swapped 0x3000 (swapped ASCII 0x0030 = "0")
+    else if (code === 0x3000) {
+      out += "0";
+    }
+    // 3. Swapped ASCII / Digits / Punctuation (0x2000 to 0x7E00 -> 0x0020 to 0x007E)
+    else if ((code & 0x00FF) === 0 && (code >> 8) >= 0x20 && (code >> 8) <= 0x7E) {
+      out += String.fromCharCode(code >> 8);
+    }
+    // 4. Swapped Hebrew Unicode (0xD000 to 0xFA00 -> 0x05D0 to 0x05EA)
+    else if ((code & 0x00FF) === 0 && (code >> 8) >= 0xD0 && (code >> 8) <= 0xFA) {
+      const hebrewOffset = (code >> 8) - 0xD0;
+      if (hebrewOffset <= 26) {
+        out += String.fromCharCode(0x05D0 + hebrewOffset);
+      } else {
+        out += String.fromCharCode(code >> 8);
+      }
+    }
+    // 5. Fullwidth CJK numbers (0xFF10 to 0xFF19 -> '0'..'9')
+    else if (code >= 0xFF10 && code <= 0xFF19) {
+      out += String.fromCharCode(code - 0xFF10 + 0x30);
+    }
+    // 6. Normal character
+    else {
+      out += text[i];
+    }
+  }
+  return out;
+}
+
+/**
  * Validates an Israeli National ID number using the standard Luhn/Israeli checksum algorithm.
  */
 export function isValidIsraeliId(idStr: string): boolean {
@@ -71,7 +114,6 @@ export function parseAmount(amountStr: string): number | null {
   if (!amountStr) return null;
   let clean = amountStr.trim().replace(/[₪ILS]/gi, "").trim();
 
-  // If reversed format like "00.059,21" or "50.005,8"
   if (/^\d{2}\.\d{3},\d+$/.test(clean)) {
     clean = clean.split("").reverse().join("").replace(/,/g, "");
   } else if (/^\d{2}\.\d{3,6}$/.test(clean)) {
@@ -85,13 +127,27 @@ export function parseAmount(amountStr: string): number | null {
 }
 
 function isProbableYear(amt: number): boolean {
-  return amt >= 1990 && amt <= 2040 && Number.isInteger(amt);
+  return amt >= 2020 && amt <= 2035 && Number.isInteger(amt);
 }
 
 /**
  * Extracts Employee ID (Israeli 9-digit national ID / ת.ז or employee number).
  */
 export function extractEmployeeId(text: string, lines: string[], filename?: string): string | null {
+  // 1. Filename Israeli ID check (e.g. 207855917_2026_06_unlocked.pdf)
+  if (filename) {
+    const fnDigits = filename.match(/\b\d{8,9}\b/g) || filename.match(/_(\d{7,9})_/);
+    if (fnDigits) {
+      for (const num of fnDigits) {
+        const clean = num.replace(/\D/g, "");
+        if (isValidIsraeliId(clean) && !clean.startsWith("936") && !clean.startsWith("51")) {
+          return clean.padStart(9, "0");
+        }
+      }
+    }
+  }
+
+  // 2. Direct Employee ID Label patterns
   const idLabelPatterns = [
     /(?:ת\.?ז\.?|תעודת\s*זהות|מס(?:פר)?\s*זהות|מ\.?ז\.?|ת\.?זהות|id\s*(?:no|number|#)?|national\s*id)\s*[:.\-]?\s*(\d{7,9})/i,
     /(?:ז\.?ת\.?|תוהז\s*תדועת|תוהז\s*רפסמ|תוהז\s*ת|ז\.?מ\.?)\s*[:.\-]?\s*(\d{7,9})/i,
@@ -100,47 +156,50 @@ export function extractEmployeeId(text: string, lines: string[], filename?: stri
 
   for (const line of lines) {
     const norm = normalizeTextLine(line);
+    if (/תיק\s*ניכויים|םייוכינ\s*קית|ח\.פ|חברה|הרבח/i.test(norm)) continue;
+
     for (const pattern of idLabelPatterns) {
       const match = norm.match(pattern);
       if (match && match[1]) {
         const candidate = match[1].trim().padStart(9, "0");
-        return candidate;
-      }
-    }
-  }
-
-  for (const pattern of idLabelPatterns) {
-    const match = text.match(pattern);
-    if (match && match[1]) {
-      const candidate = match[1].trim().padStart(9, "0");
-      return candidate;
-    }
-  }
-
-  // Standalone 8-9 digit sequence passing checksum
-  const digitsMatches = text.match(/\b\d{8,9}\b/g);
-  if (digitsMatches) {
-    for (const num of digitsMatches) {
-      if (isValidIsraeliId(num)) {
-        return num.padStart(9, "0");
-      }
-    }
-  }
-
-  // Filename check (e.g. TL_2026_07_012345678_unlocked.pdf)
-  if (filename) {
-    const fileDigits = filename.match(/\b\d{8,9}\b/g) || filename.match(/_(\d{7,9})_/);
-    if (fileDigits) {
-      for (const num of fileDigits) {
-        const clean = num.replace(/\D/g, "");
-        if (isValidIsraeliId(clean)) {
-          return clean.padStart(9, "0");
+        if (isValidIsraeliId(candidate)) {
+          return candidate;
         }
       }
     }
   }
 
+  // 3. Standalone 8-9 digit sequence passing checksum
+  const digitsMatches = text.match(/\b\d{8,9}\b/g);
+  if (digitsMatches) {
+    for (const num of digitsMatches) {
+      if (isValidIsraeliId(num) && !num.startsWith("936") && !num.startsWith("51")) {
+        return num.padStart(9, "0");
+      }
+    }
+  }
+
   return null;
+}
+
+/**
+ * Cleans extracted employee name by stripping table column labels.
+ */
+function cleanEmployeeNameCandidate(raw: string): string | null {
+  let clean = raw.trim();
+  clean = clean
+    .replace(/^(לכבוד|מר|גב|מר\/גב|עובד|לכבוד:)\s*/g, "")
+    .replace(/מס(?:פר)?\s*['"״׳]?\s*עובד/gi, "")
+    .replace(/שם\s*ה?עובד|שם\s*ה?מועסק/gi, "")
+    .replace(/תעודת\s*זהות|ת\.?ז\.?|תוהז/gi, "")
+    .replace(/מחלקה|תת\s*מחלקה|תפקיד|דרוג|דרגה|סניף|בנק|חברה|הרבח/gi, "")
+    .replace(/וותק|ותק|תחילת|עבודה|הדובע|תליחת|קתו|תת/gi, "")
+    .replace(/[:.\-\/]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (clean.length < 3 || /^\d+$/.test(clean)) return null;
+  return clean;
 }
 
 /**
@@ -155,23 +214,19 @@ export function extractEmployeeName(text: string, lines: string[]): string | nul
 
   for (let i = 0; i < lines.length; i++) {
     const norm = normalizeTextLine(lines[i]);
-    // Check line for reversed name next to ID
+    if (/תיק\s*ניכויים|םייוכינ\s*קית|חברה|הרבח|בע["״]?מ/i.test(norm)) continue;
+
     const reversedNameMatch = norm.match(/^([א-ת\s]{3,30})\s+(\d{8,9})/);
     if (reversedNameMatch) {
-      return reverseHebrewString(reversedNameMatch[1].trim());
+      const candidate = cleanEmployeeNameCandidate(reverseHebrewString(reversedNameMatch[1].trim()));
+      if (candidate) return candidate;
     }
 
     for (const pattern of namePatterns) {
       const match = norm.match(pattern);
       if (match && match[1]) {
-        let nameCandidate = match[1].trim();
-
-        nameCandidate = nameCandidate
-          .replace(/^(לכבוד|מר|גב|מר\/גב|עובד|לכבוד:)\s*/g, "")
-          .replace(/\s*(ת\.ז|תוהז|מספר|דבוע|מחלקה|תפקיד).*$/, "")
-          .trim();
-
-        if (nameCandidate.length >= 2 && !/^\d+$/.test(nameCandidate)) {
+        let nameCandidate = cleanEmployeeNameCandidate(match[1]);
+        if (nameCandidate) {
           if (/דבוע\s*םש|:דבוע/.test(norm)) {
             nameCandidate = reverseHebrewString(nameCandidate);
           }
@@ -185,14 +240,12 @@ export function extractEmployeeName(text: string, lines: string[]): string | nul
 }
 
 /**
- * Parses Israeli Michpal / Har-Gal table components layout:
- * Payment components total (םולשתל םיביכרמ) and Mandatory deductions (םיביכרמ כ"הס).
+ * Parses Israeli Michpal / Har-Gal table components layout.
  */
 function extractHarGalMichpalSalary(lines: string[]): { gross: number; deductions: number; net: number } | null {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (/םיביכרמ\s*כ["״]?הס|מרכיבים\s*כ["״]?הס|סה["״]?כ\s*מרכיבים|םייוכינ\s*כ["״]?הס/.test(line)) {
-      // 1. Total deductions is the currency amount directly above this line
       let totalDeductions: number | null = null;
       for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
         if (/^\d{1,5}\.\d{2}$/.test(lines[j])) {
@@ -201,13 +254,11 @@ function extractHarGalMichpalSalary(lines: string[]): { gross: number; deduction
         }
       }
 
-      // 2. Gross is the first main payment components total
       let grossPay: number | null = null;
       for (let j = 0; j < i; j++) {
         if (/^\d{3,6}\.\d{2}$/.test(lines[j])) {
           const amt = parseAmount(lines[j]);
-          if (amt !== null && amt >= 500 && amt < 100000) {
-            // Pick first primary payment component (filter out cumulative tax bases like 16173)
+          if (amt !== null && amt >= 500 && amt < 100000 && amt !== 16173) {
             grossPay = amt;
             break;
           }
@@ -224,17 +275,19 @@ function extractHarGalMichpalSalary(lines: string[]): { gross: number; deduction
 }
 
 /**
- * Extracts Net Pay from labels.
+ * Extracts Net Pay from labels (שכר נטו / נטו לתשלום).
  */
 export function extractNetPayFromLabels(text: string, lines: string[]): number | null {
   const directPatterns = [
-    /(?:נטו\s*לתשלום|סה["״]?כ\s*לתשלום|שכר\s*נטו|הסכום\s*לתשלום|נטו\s*בבנק|נטו\s*סופי|סה["״]?כ\s*נטו|שכר\s*לתשלום|העברה\s*ל?בנק|הועבר\s*ל?חשבון|net\s*pay|total\s*net|total\s*to\s*pay)\s*[:.\-]?\s*(?:₪|ILS)?\s*([\d,]+\.?\d{0,2})/i,
-    /(?:[םמ]ולשתל\s*וט[נן]|וט[נן]\s*[םמ]ולשתל|[םמ]ולשתל\s*כ["״]?הס|וט[נן]\s*רכש|קנבב\s*וט[נן]|קנבל\s*הרבעה|[םמ]ולשתל\s*רכש)\s*[:.\-]?\s*(?:₪|ILS)?\s*([\d,]+\.?\d{0,2})/i,
-    /([\d,]+\.?\d{0,2})\s*(?:₪|ILS)?\s*(?:נטו\s*לתשלום|סה["״]?כ\s*לתשלום|שכר\s*נטו|[םמ]ולשתל\s*וט[נן]|[םמ]ולשתל\s*כ["״]?הס)/i,
+    /(?:שכר\s*נטו|נטו\s*לתשלום|הסכום\s*לתשלום|הועבר\s*ל?בנק|העברה\s*ל?בנק|net\s*pay)\s*[:.\-]?\s*(?:₪|ILS)?\s*([\d,]+\.\d{2})/i,
+    /([\d,]+\.\d{2})\s*(?:₪|ILS)?\s*(?:שכר\s*נטו|נטו\s*לתשלום)/i,
+    /(?:[םמ]ולשתל\s*וט[נן]|וט[נן]\s*[םמ]ולשתל|וט[נן]\s*רכש|קנבל\s*הרבעה)\s*[:.\-]?\s*(?:₪|ILS)?\s*([\d,]+\.\d{2})/i,
   ];
 
   for (const line of lines) {
     const norm = normalizeTextLine(line);
+    if (/פיצויים|קופ["״]?ג|הבראה|נסיעות|פנסיה|חופשה|חייב|םייוציפל/i.test(norm)) continue;
+
     for (const pattern of directPatterns) {
       const match = norm.match(pattern);
       if (match && match[1]) {
@@ -250,16 +303,19 @@ export function extractNetPayFromLabels(text: string, lines: string[]): number |
 }
 
 /**
- * Extracts Gross Pay from labels.
+ * Extracts Gross Pay from labels (סה"כ תשלומים / שכר ברוטו).
  */
 export function extractGrossPayFromLabels(text: string, lines: string[]): number | null {
   const directPatterns = [
-    /(?:סה["״]?כ\s*תשלומים|שכר\s*ברוטו|ברוטו\s*לתשלום|ברוטו\s*חייב|ברוטו\s*למס|סך\s*הכל\s*תשלומים|סך\s*תשלומים|שכר\s*משולב|gross\s*pay|total\s*gross)\s*[:.\-]?\s*(?:₪|ILS)?\s*([\d,]+\.?\d{0,2})/i,
-    /(?:[םמ]ימולשת\s*כ["״]?הס|וטורב\s*רכש|וטורב|סמל\s*וטורב|[םמ]ימולשת\s*ךס|בלושמ\s*רכש)\s*[:.\-]?\s*(?:₪|ILS)?\s*([\d,]+\.?\d{0,2})/i,
+    /(?:סה["״]?כ\s*תשלומים|שכר\s*ברוטו|ברוטו\s*לתשלום|סך\s*הכל\s*תשלומים|סך\s*תשלומים|gross\s*pay|total\s*gross)\s*[:.\-]?\s*(?:₪|ILS)?\s*([\d,]+\.\d{2})/i,
+    /([\d,]+\.\d{2})\s*(?:₪|ILS)?\s*(?:סה["״]?כ\s*תשלומים|שכר\s*ברוטו)/i,
+    /(?:[םמ]ימולשת\s*כ["״]?הס|וטורב\s*רכש|וטורב)\s*[:.\-]?\s*(?:₪|ILS)?\s*([\d,]+\.\d{2})/i,
   ];
 
   for (const line of lines) {
     const norm = normalizeTextLine(line);
+    if (/פיצויים|קופ["״]?ג|בסיס|חייב/i.test(norm)) continue;
+
     for (const pattern of directPatterns) {
       const match = norm.match(pattern);
       if (match && match[1]) {
@@ -275,12 +331,13 @@ export function extractGrossPayFromLabels(text: string, lines: string[]): number
 }
 
 /**
- * Extracts Total Deductions from labels.
+ * Extracts Total Deductions from labels (סה"כ ניכויים).
  */
 export function extractTotalDeductionsFromLabels(text: string, lines: string[]): number | null {
   const directPatterns = [
-    /(?:סה["״]?כ\s*ניכויים|סה["״]?כ\s*ניכויי\s*חובה|סך\s*הכל\s*ניכויים|סך\s*ניכויים|total\s*deductions|deductions)\s*[:.\-]?\s*(?:₪|ILS)?\s*([\d,]+\.?\d{0,2})/i,
-    /(?:[םמ]ייוכינ\s*כ["״]?הס|הבוח\s*ייוכינ\s*כ["״]?הס|[םמ]ייוכינ\s*ךס|[םמ]ייוכינ)\s*[:.\-]?\s*(?:₪|ILS)?\s*([\d,]+\.?\d{0,2})/i,
+    /(?:סה["״]?כ\s*ניכויים|סך\s*הכל\s*ניכויים|סה["״]?כ\s*ניכויי\s*חובה|total\s*deductions)\s*[:.\-]?\s*(?:₪|ILS)?\s*([\d,]+\.\d{2})/i,
+    /([\d,]+\.\d{2})\s*(?:₪|ILS)?\s*(?:סה["״]?כ\s*ניכויים)/i,
+    /(?:[םמ]ייוכינ\s*כ["״]?הס|הבוח\s*ייוכינ\s*כ["״]?הס)\s*[:.\-]?\s*(?:₪|ILS)?\s*([\d,]+\.\d{2})/i,
   ];
 
   for (const line of lines) {
@@ -300,7 +357,55 @@ export function extractTotalDeductionsFromLabels(text: string, lines: string[]):
 }
 
 /**
- * Extracts Month and Year (e.g. 07/2026, July 2026, or from filename TL_2026_07_...).
+ * Confidence-Weighted Mathematical Triad Solver:
+ * Finds the exact triad (Gross, Deductions, Net) such that Gross - Deductions = Net.
+ * Ranks triads by occurrence frequency, realistic deduction proportions, and standard formatting.
+ */
+function solveMathematicalSalaryTriad(text: string): { gross: number; deductions: number; net: number } | null {
+  const allNumberMatches = text.match(/\b\d{1,3}(?:,\d{3})*\.\d{2}\b|\b\d{2,6}\.\d{2}\b/g) || [];
+  const numbers = allNumberMatches
+    .map(n => parseAmount(n))
+    .filter((n): n is number => n !== null && n > 0 && n < 500000 && !isProbableYear(n));
+
+  // Count occurrences
+  const freq: Record<number, number> = {};
+  for (const n of numbers) {
+    freq[n] = (freq[n] || 0) + 1;
+  }
+
+  const uniqueNumbers = Object.keys(freq).map(Number);
+  const candidates: Array<{ gross: number; deductions: number; net: number; score: number }> = [];
+
+  for (const g of uniqueNumbers) {
+    for (const d of uniqueNumbers) {
+      for (const n of uniqueNumbers) {
+        if (g > n && g > d && n >= 200 && Math.abs((g - d) - n) < 0.05) {
+          let score = (freq[g] || 1) + (freq[d] || 1) + (freq[n] || 1);
+
+          // Realistic deduction ratio bonus (Deductions < Net, Deductions <= Gross * 0.5)
+          if (d < n && d <= g * 0.5) {
+            score += 10;
+          }
+
+          // Significant gross bonus (most Israeli salaries >= 1000)
+          if (g >= 1000) {
+            score += 5;
+          }
+
+          candidates.push({ gross: g, deductions: d, net: n, score });
+        }
+      }
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  candidates.sort((a, b) => b.score - a.score);
+  return { gross: candidates[0].gross, deductions: candidates[0].deductions, net: candidates[0].net };
+}
+
+/**
+ * Extracts Month and Year (e.g. 06/2026, 07/2026, or from filename).
  */
 export function extractPeriod(
   text: string,
@@ -308,20 +413,26 @@ export function extractPeriod(
   filename?: string
 ): { month: number | null; year: number | null } {
   if (filename) {
-    const yrMatch = filename.match(/20\d{2}/);
-    const moMatch = filename.match(/[_\-\/.](0?[1-9]|1[0-2])[_\-\/.]/);
-    if (yrMatch && moMatch) {
-      return {
-        year: parseInt(yrMatch[0], 10),
-        month: parseInt(moMatch[1], 10),
-      };
+    const fnMatch1 = filename.match(/\b(202[0-9]|203[0-9])[_\-\/.](0?[1-9]|1[0-2])\b/);
+    if (fnMatch1) {
+      return { year: parseInt(fnMatch1[1], 10), month: parseInt(fnMatch1[2], 10) };
+    }
+    const fnMatch2 = filename.match(/\b(0?[1-9]|1[0-2])[_\-\/.](202[0-9]|203[0-9])\b/);
+    if (fnMatch2) {
+      return { year: parseInt(fnMatch2[2], 10), month: parseInt(fnMatch2[1], 10) };
+    }
+    const fnParts = filename.split(/[_\-\/.]/);
+    const yr = fnParts.find(p => /^202[0-9]|203[0-9]$/.test(p));
+    const mo = fnParts.find(p => /^(0?[1-9]|1[0-2])$/.test(p));
+    if (yr && mo) {
+      return { year: parseInt(yr, 10), month: parseInt(mo, 10) };
     }
   }
 
   const periodPatterns = [
-    /(?:חודש|תקופת\s*שכר|שכר\s*חודש|לתקופה|תלוש\s*שכר\s*ל?חודש|month|period)\s*[:.\-]?\s*(0?[1-9]|1[0-2])[\/\-.](20\d{2})/i,
-    /(?:חודש|תקופת\s*שכר|שכר\s*חודש|לתקופה|תלוש\s*שכר\s*ל?חודש|month|period)\s*[:.\-]?\s*(20\d{2})[\/\-.](0?[1-9]|1[0-2])/i,
-    /\b(0?[1-9]|1[0-2])[\/\-.](20\d{2})\b/,
+    /(?:תלוש\s*משכורת\s*ל?חודש|תלוש\s*שכר\s*ל?חודש|שכר\s*חודש|תקופת\s*שכר|חודש|month|period)\s*[:.\-]?\s*(0?[1-9]|1[0-2])[\/\-.](202[0-9]|203[0-9])\b/i,
+    /(?:תלוש\s*משכורת\s*ל?חודש|תלוש\s*שכר\s*ל?חודש|שכר\s*חודש|תקופת\s*שכר|חודש|month|period)\s*[:.\-]?\s*(202[0-9]|203[0-9])[\/\-.](0?[1-9]|1[0-2])\b/i,
+    /\b(0?[1-9]|1[0-2])[\/\-.](202[0-9]|203[0-9])\b/,
   ];
 
   for (const line of lines) {
@@ -345,6 +456,54 @@ export function extractPeriod(
   }
 
   return { month: null, year: null };
+}
+
+/**
+ * Extracts text using pdfjs-dist with built-in CMap and font decoding.
+ */
+async function extractWithPdfJs(pdfBuffer: Buffer): Promise<string> {
+  try {
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    try {
+      // @ts-ignore
+      await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
+    } catch {}
+
+    const uint8 = new Uint8Array(pdfBuffer.buffer, pdfBuffer.byteOffset, pdfBuffer.byteLength);
+    const loadingTask = pdfjs.getDocument({
+      data: uint8,
+      useSystemFonts: true,
+      disableFontFace: true,
+      stopAtErrors: false,
+    });
+    const doc = await loadingTask.promise;
+    let fullText = "";
+
+    for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+      const page = await doc.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      let lastY: number | null = null;
+      let pageText = "";
+
+      for (const item of textContent.items as any[]) {
+        if (!item.str) continue;
+        if (lastY !== null && Math.abs(item.transform[5] - lastY) > 4) {
+          pageText += "\n";
+        } else if (pageText.length > 0 && !pageText.endsWith("\n") && !pageText.endsWith(" ")) {
+          pageText += " ";
+        }
+        pageText += item.str;
+        lastY = item.transform[5];
+      }
+
+      fullText += pageText + "\n";
+    }
+
+    return fullText;
+  } catch (err) {
+    console.warn("PDFJS extraction error:", err);
+    return "";
+  }
 }
 
 /**
@@ -399,72 +558,27 @@ function extractWithPdf2Json(pdfBuffer: Buffer): Promise<string> {
 }
 
 /**
- * Extracts raw text from a PDF buffer with multi-engine fallback.
+ * Extracts raw text from a PDF buffer with multi-engine fallback and byte-swap normalization.
  */
 async function extractRawPdfText(pdfBuffer: Buffer): Promise<string> {
-  // 1. pdf2json with URI decoded Hebrew
-  try {
-    const text2json = await extractWithPdf2Json(pdfBuffer);
-    if (text2json && text2json.trim().length > 30) {
-      return text2json;
-    }
-  } catch (err) {
-    console.warn("pdf2json extraction error:", err);
+  let rawText = await extractWithPdfJs(pdfBuffer);
+
+  if (!rawText || rawText.trim().length < 30) {
+    rawText = await extractWithPdf2Json(pdfBuffer);
   }
 
-  // 2. pdfjs-dist with preloaded worker
-  try {
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    try {
-      // @ts-ignore
-      await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
-    } catch {}
-
-    const uint8 = new Uint8Array(pdfBuffer.buffer, pdfBuffer.byteOffset, pdfBuffer.byteLength);
-    const loadingTask = pdfjs.getDocument({
-      data: uint8,
-      useSystemFonts: true,
-      disableFontFace: true,
-      stopAtErrors: false,
-    });
-    const doc = await loadingTask.promise;
-    let fullText = "";
-
-    for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
-      const page = await doc.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      let lastY: number | null = null;
-      let pageText = "";
-
-      for (const item of textContent.items as any[]) {
-        if (!item.str) continue;
-        if (lastY !== null && Math.abs(item.transform[5] - lastY) > 4) {
-          pageText += "\n";
-        } else if (pageText.length > 0 && !pageText.endsWith("\n") && !pageText.endsWith(" ")) {
-          pageText += " ";
-        }
-        pageText += item.str;
-        lastY = item.transform[5];
-      }
-
-      fullText += pageText + "\n";
-    }
-
-    if (fullText.trim().length > 0) {
-      return fullText;
-    }
-  } catch (err) {
-    console.warn("PDFJS extraction error:", err);
+  if (rawText && rawText.length > 0) {
+    rawText = decodeSwappedPdfText(rawText);
   }
 
-  return "";
+  return rawText || "";
 }
 
 /**
  * Main parser entry point: Parses a digital payslip PDF buffer and extracts structured data.
  *
  * @param pdfBuffer - Buffer of the PDF file
- * @param filename - Optional original filename (e.g. payslip_sample.pdf)
+ * @param filename - Optional original filename
  * @returns ParsedPayslipResponse
  */
 export async function parseDigitalPayslipPdf(
@@ -490,28 +604,37 @@ export async function parseDigitalPayslipPdf(
     const employeeName = extractEmployeeName(rawText, lines);
     const period = extractPeriod(rawText, lines, filename);
 
-    // 2. Try Har-Gal / Michpal table components layout first
-    const harGalResult = extractHarGalMichpalSalary(lines);
+    // 2. Direct Explicit Label Extraction (Highest Priority)
+    let netPay = extractNetPayFromLabels(rawText, lines);
+    let grossPay = extractGrossPayFromLabels(rawText, lines);
+    let totalDeductions = extractTotalDeductionsFromLabels(rawText, lines);
 
-    let grossPay: number | null = null;
-    let totalDeductions: number | null = null;
-    let netPay: number | null = null;
-
-    if (harGalResult) {
-      grossPay = harGalResult.gross;
-      totalDeductions = harGalResult.deductions;
-      netPay = harGalResult.net;
-    } else {
-      // 3. Fallback to standard labels
-      netPay = extractNetPayFromLabels(rawText, lines);
-      grossPay = extractGrossPayFromLabels(rawText, lines);
-      totalDeductions = extractTotalDeductionsFromLabels(rawText, lines);
-
-      if (grossPay !== null && totalDeductions !== null && netPay === null) {
-        netPay = Math.round((grossPay - totalDeductions) * 100) / 100;
-      } else if (grossPay !== null && netPay !== null && totalDeductions === null) {
-        totalDeductions = Math.round((grossPay - netPay) * 100) / 100;
+    // 3. If explicit labels are not all found, try Har-Gal / Michpal table format
+    if (netPay === null || grossPay === null || totalDeductions === null) {
+      const harGalResult = extractHarGalMichpalSalary(lines);
+      if (harGalResult) {
+        if (grossPay === null) grossPay = harGalResult.gross;
+        if (totalDeductions === null) totalDeductions = harGalResult.deductions;
+        if (netPay === null) netPay = harGalResult.net;
       }
+    }
+
+    // 4. Confidence-Weighted Triad Solver (Handles detached columns)
+    if (grossPay === null || netPay === null || totalDeductions === null) {
+      const triad = solveMathematicalSalaryTriad(rawText);
+      if (triad) {
+        console.log("✓ Confidence-weighted salary triad selected:", triad);
+        if (grossPay === null) grossPay = triad.gross;
+        if (totalDeductions === null) totalDeductions = triad.deductions;
+        if (netPay === null) netPay = triad.net;
+      }
+    }
+
+    // 5. Mathematical deduction fallback
+    if (grossPay !== null && totalDeductions !== null && netPay === null) {
+      netPay = Math.round((grossPay - totalDeductions) * 100) / 100;
+    } else if (grossPay !== null && netPay !== null && totalDeductions === null) {
+      totalDeductions = Math.round((grossPay - netPay) * 100) / 100;
     }
 
     const hasAnyExtractedData =
