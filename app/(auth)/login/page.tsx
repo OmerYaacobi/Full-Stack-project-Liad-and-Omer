@@ -23,7 +23,8 @@ export default async function LoginPage({
     <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
       <h1 className="text-xl font-bold text-slate-900">Sign in</h1>
       <p className="mt-1 text-sm text-slate-500">
-        We will email you a link that signs you in. No password needed.
+        Use the password you chose when registering, or have a sign-in link
+        emailed to you instead.
       </p>
 
       {error && CALLBACK_ERRORS[error] && (

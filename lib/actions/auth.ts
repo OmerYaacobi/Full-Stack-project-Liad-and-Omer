@@ -4,10 +4,74 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { fail, fromZod, type ActionResult } from "@/lib/actions/result";
+import { roleHome } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
-import { loginSchema } from "@/lib/validations/auth";
+import { loginSchema, passwordLoginSchema } from "@/lib/validations/auth";
+import type { AppRole } from "@/types/app";
 
-export async function sendMagicLink(
+/**
+ * The sign-in form offers two ways in, chosen by which submit button was used.
+ * Both live in one action so the form keeps a single `useActionState` and one
+ * place to render errors.
+ */
+export async function signIn(
+  previous: ActionResult<void> | null,
+  formData: FormData,
+): Promise<ActionResult<void>> {
+  if (formData.get("intent") === "password") {
+    return signInWithPassword(formData);
+  }
+  return sendMagicLink(previous, formData);
+}
+
+async function signInWithPassword(
+  formData: FormData,
+): Promise<ActionResult<void>> {
+  const parsed = passwordLoginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) return fromZod(parsed.error);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
+
+  if (error) {
+    if (error.status === 429) {
+      return fail("RATE_LIMITED", "Too many attempts. Wait a minute and try again.");
+    }
+    // Supabase returns the same "invalid credentials" for a wrong password and
+    // an address that was never registered, which is what we want to surface.
+    return fail("UNAUTHENTICATED", "That email and password do not match an account.");
+  }
+
+  const destination =
+    sanitiseNext(formData.get("next")) ??
+    (await landingFor(supabase, data.user.id));
+  redirect(destination);
+}
+
+/**
+ * Bookkeepers hold a firm membership rather than a company one, so they have no
+ * role home in the app shell and belong on the firm dashboard instead.
+ */
+async function landingFor(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<string> {
+  const { data } = await supabase
+    .from("memberships")
+    .select("role")
+    .eq("profile_id", userId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  return data?.role ? roleHome(data.role as AppRole) : "/dashboard";
+}
+
+async function sendMagicLink(
   _previous: ActionResult<void> | null,
   formData: FormData,
 ): Promise<ActionResult<void>> {

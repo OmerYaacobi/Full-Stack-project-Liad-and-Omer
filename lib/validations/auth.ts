@@ -11,6 +11,14 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
+// Accounts created through the bookkeeper signup and the invite flow both set a
+// password, so the sign-in page has to accept one as well as a magic link.
+export const passwordLoginSchema = loginSchema.extend({
+  password: z.string().min(1, "Enter your password."),
+});
+
+export type PasswordLoginInput = z.infer<typeof passwordLoginSchema>;
+
 // 1. Bookkeeping Firm Registration Schema
 export const bookkeeperSignupSchema = z
   .object({
