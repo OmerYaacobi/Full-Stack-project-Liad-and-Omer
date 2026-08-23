@@ -82,6 +82,12 @@ export const inviteSignupSchema = z
     confirmPassword: z
       .string()
       .min(6, { message: "Confirm password must be at least 6 characters" }),
+    nationalId: z
+      .string()
+      .trim()
+      .min(7, { message: "ID number must be at least 7 digits" })
+      .max(12, { message: "ID number is too long" })
+      .regex(/^\d{7,9}$/, { message: "Enter a valid 7 to 9 digit ID number (ת.ז)" }),
     phone: z
       .string()
       .trim()

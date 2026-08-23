@@ -32,9 +32,18 @@ create table if not exists public.profiles (
   full_name   text not null check (length(btrim(full_name)) between 2 and 120),
   email       citext not null unique,
   phone       text check (phone is null or phone ~ '^\+?[0-9\-\s]{7,20}$'),
+  national_id text,                               -- Israeli National ID (ת.ז)
   locale      text not null default 'en' check (locale in ('he', 'en')),
   created_at  timestamptz not null default now()
 );
+
+do $$ begin
+  if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'profiles') then
+    if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'national_id') then
+      alter table public.profiles add column national_id text;
+    end if;
+  end if;
+end $$;
 
 -- Bookkeeping Firms (Parent Account / Agency that manages client businesses)
 create table if not exists public.bookkeeping_firms (
@@ -128,6 +137,7 @@ create table if not exists public.employees (
   company_id      uuid not null references public.companies(id) on delete cascade,
   membership_id   uuid unique references public.memberships(id) on delete set null,
   employee_number text not null,
+  national_id     text,                               -- Israeli National ID (ת.ז)
   full_name       text not null,
   national_id_last4 char(4),
   department      text,
@@ -143,7 +153,17 @@ create table if not exists public.employees (
   unique (company_id, employee_number),
   check (manager_id is distinct from id)
 );
+
+do $$ begin
+  if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'employees') then
+    if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'employees' and column_name = 'national_id') then
+      alter table public.employees add column national_id text;
+    end if;
+  end if;
+end $$;
+
 create index if not exists idx_employees_company_status on public.employees (company_id, status);
+create index if not exists idx_employees_national_id on public.employees (company_id, national_id);
 create index if not exists idx_employees_manager on public.employees (manager_id) where manager_id is not null;
 create index if not exists idx_employees_name_trgm on public.employees using gin (full_name gin_trgm_ops);
 
@@ -643,6 +663,7 @@ declare
   v_signup_type text;
   v_firm_name text;
   v_tax_id text;
+  v_national_id text;
   v_firm_id uuid;
   v_invitation_token text;
   v_invitation record;
@@ -657,14 +678,16 @@ begin
   v_signup_type := coalesce(new.raw_user_meta_data->>'signup_type', 'worker');
   v_firm_name := new.raw_user_meta_data->>'firm_name';
   v_tax_id := new.raw_user_meta_data->>'tax_id';
+  v_national_id := coalesce(new.raw_user_meta_data->>'national_id', new.raw_user_meta_data->>'id_number');
   v_invitation_token := new.raw_user_meta_data->>'invitation_token';
 
   -- 1. Create or update profile
-  insert into public.profiles (id, full_name, email, phone, locale)
-  values (new.id, v_full_name, new.email, v_phone, 'en')
+  insert into public.profiles (id, full_name, email, phone, locale, national_id)
+  values (new.id, v_full_name, new.email, v_phone, 'en', v_national_id)
   on conflict (id) do update
   set full_name = excluded.full_name,
-      phone = coalesce(excluded.phone, profiles.phone);
+      phone = coalesce(excluded.phone, profiles.phone),
+      national_id = coalesce(excluded.national_id, profiles.national_id);
 
   -- 2. CASE A: Bookkeeping Firm Registration
   if v_signup_type = 'bookkeeper' and v_tax_id is not null and length(btrim(v_tax_id)) > 0 then
@@ -696,19 +719,34 @@ begin
       on conflict (company_id, profile_id) do update set role = v_invitation.role, is_active = true
       returning id into v_membership_id;
 
-      -- Create/link employee record
-      v_employee_num := coalesce(new.raw_user_meta_data->>'employee_number', substr(md5(random()::text), 1, 6));
-      insert into public.employees (company_id, membership_id, employee_number, full_name, job_title, department, start_date)
+      -- Create/link employee record with national ID
+      v_employee_num := coalesce(v_national_id, new.raw_user_meta_data->>'employee_number', substr(md5(random()::text), 1, 6));
+      insert into public.employees (
+        company_id,
+        membership_id,
+        employee_number,
+        national_id,
+        national_id_last4,
+        full_name,
+        job_title,
+        department,
+        start_date
+      )
       values (
         v_invitation.company_id,
         v_membership_id,
         v_employee_num,
+        v_national_id,
+        case when v_national_id is not null then right(v_national_id, 4) else null end,
         v_full_name,
         new.raw_user_meta_data->>'job_title',
         new.raw_user_meta_data->>'department',
         current_date
       )
-      on conflict (company_id, employee_number) do update set membership_id = v_membership_id;
+      on conflict (company_id, employee_number) do update
+      set membership_id = v_membership_id,
+          national_id = coalesce(excluded.national_id, employees.national_id),
+          national_id_last4 = coalesce(excluded.national_id_last4, employees.national_id_last4);
 
       -- Mark invitation as used
       update public.invitations

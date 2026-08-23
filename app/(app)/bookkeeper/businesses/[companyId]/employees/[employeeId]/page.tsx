@@ -57,7 +57,7 @@ export default async function EmployeeDocumentsPage({
       <PageHeader
         title={employee.fullName}
         description={[
-          `#${employee.employeeNumber}`,
+          employee.nationalId ? `ID: ${employee.nationalId}` : `#${employee.employeeNumber}`,
           employee.jobTitle,
           employee.department,
           `${payslips.length} ${payslips.length === 1 ? "pay slip" : "pay slips"}`,

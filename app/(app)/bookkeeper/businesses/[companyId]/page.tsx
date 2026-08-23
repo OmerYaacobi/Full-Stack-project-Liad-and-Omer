@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { DocumentUploadForm } from "@/components/documents/document-upload-form";
 import { InvitePeoplePanel } from "@/components/invites/invite-people-panel";
+import { SmartBusinessPayslipUpload } from "@/components/payslips/smart-business-payslip-upload";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { countDocumentsByEmployee } from "@/lib/actions/documents";
@@ -55,7 +56,8 @@ export default async function BusinessPage({
       <InvitePeoplePanel companyId={company.id} companyName={company.name} />
 
       {employees.length > 0 && (
-        <div className="mt-8">
+        <div className="mt-8 space-y-6">
+          <SmartBusinessPayslipUpload companyId={companyId} employees={employees} />
           <DocumentUploadForm companyId={companyId} employees={employees} />
         </div>
       )}
@@ -81,7 +83,7 @@ export default async function BusinessPage({
                     </p>
                     <p className="text-xs text-slate-500">
                       {employee.role === "manager" ? "Manager" : "Employee"}
-                      {" · "}#{employee.employeeNumber}
+                      {" · "}ID: {employee.nationalId || employee.employeeNumber}
                       {employee.jobTitle ? ` · ${employee.jobTitle}` : ""}
                     </p>
                   </div>

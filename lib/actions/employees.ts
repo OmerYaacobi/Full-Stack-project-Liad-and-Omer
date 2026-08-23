@@ -6,6 +6,7 @@ export type CompanyEmployee = {
   id: string;
   fullName: string;
   employeeNumber: string;
+  nationalId: string | null;
   jobTitle: string | null;
   department: string | null;
   status: string;
@@ -24,7 +25,7 @@ export async function listCompanyEmployees(
   const { data, error } = await supabase
     .from("employees")
     .select(
-      "id, full_name, employee_number, job_title, department, status, memberships(role)",
+      "id, full_name, employee_number, national_id, job_title, department, status, memberships(role)",
     )
     .eq("company_id", companyId)
     .order("full_name", { ascending: true });
@@ -35,6 +36,7 @@ export async function listCompanyEmployees(
     id: row.id,
     fullName: row.full_name,
     employeeNumber: row.employee_number,
+    nationalId: row.national_id || row.employee_number || null,
     jobTitle: row.job_title,
     department: row.department,
     status: row.status,
@@ -71,7 +73,7 @@ export async function getCompanyEmployee(
   const { data, error } = await supabase
     .from("employees")
     .select(
-      "id, full_name, employee_number, job_title, department, status, memberships(role)",
+      "id, full_name, employee_number, national_id, job_title, department, status, memberships(role)",
     )
     .eq("company_id", companyId)
     .eq("id", employeeId)
@@ -83,6 +85,7 @@ export async function getCompanyEmployee(
     id: data.id,
     fullName: data.full_name,
     employeeNumber: data.employee_number,
+    nationalId: data.national_id || data.employee_number || null,
     jobTitle: data.job_title,
     department: data.department,
     status: data.status,

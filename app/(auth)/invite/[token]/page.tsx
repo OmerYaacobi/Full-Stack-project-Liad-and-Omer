@@ -22,6 +22,7 @@ export default function InviteSignupPage() {
 
   const [formData, setFormData] = useState<Omit<InviteSignupInput, "token">>({
     fullName: "",
+    nationalId: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -102,6 +103,7 @@ export default function InviteSignupPage() {
         options: {
           data: {
             full_name: formData.fullName.trim(),
+            national_id: formData.nationalId.trim(),
             phone: formData.phone?.trim() || null,
             job_title: formData.jobTitle?.trim() || null,
             department: formData.department?.trim() || null,
@@ -221,28 +223,54 @@ export default function InviteSignupPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {/* Full Name */}
-        <div>
-          <label htmlFor="fullName" className="block text-xs font-semibold text-slate-700 mb-1">
-            Full Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="fullName"
-            name="fullName"
-            type="text"
-            required
-            value={formData.fullName}
-            onChange={handleChange}
-            placeholder="e.g. Jane Doe"
-            className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
-              fieldErrors.fullName
-                ? "border-red-400 focus:ring-red-200"
-                : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-            } focus:outline-none focus:ring-2 transition`}
-          />
-          {fieldErrors.fullName && (
-            <p className="text-xs text-red-600 mt-1">{fieldErrors.fullName}</p>
-          )}
+        {/* Full Name & National ID */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="fullName" className="block text-xs font-semibold text-slate-700 mb-1">
+              Full Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="fullName"
+              name="fullName"
+              type="text"
+              required
+              value={formData.fullName}
+              onChange={handleChange}
+              placeholder="e.g. Jane Doe"
+              className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
+                fieldErrors.fullName
+                  ? "border-red-400 focus:ring-red-200"
+                  : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
+              } focus:outline-none focus:ring-2 transition`}
+            />
+            {fieldErrors.fullName && (
+              <p className="text-xs text-red-600 mt-1">{fieldErrors.fullName}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="nationalId" className="block text-xs font-semibold text-slate-700 mb-1">
+              National ID / ת.ז <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="nationalId"
+              name="nationalId"
+              type="text"
+              required
+              maxLength={9}
+              value={formData.nationalId}
+              onChange={handleChange}
+              placeholder="e.g. 012345678"
+              className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
+                fieldErrors.nationalId
+                  ? "border-red-400 focus:ring-red-200"
+                  : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
+              } focus:outline-none focus:ring-2 transition`}
+            />
+            {fieldErrors.nationalId && (
+              <p className="text-xs text-red-600 mt-1">{fieldErrors.nationalId}</p>
+            )}
+          </div>
         </div>
 
         {/* Email & Phone */}
