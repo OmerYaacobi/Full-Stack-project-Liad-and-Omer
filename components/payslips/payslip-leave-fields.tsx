@@ -10,6 +10,7 @@ export function PayslipLeaveFields({
   onSickChange,
   disabled,
   compact = false,
+  idPrefix = "",
 }: {
   vacationDays: string;
   sickDays: string;
@@ -17,6 +18,7 @@ export function PayslipLeaveFields({
   onSickChange: (value: string) => void;
   disabled?: boolean;
   compact?: boolean;
+  idPrefix?: string;
 }) {
   const labelClass = compact
     ? "block text-xs font-semibold text-slate-700 mb-1"
@@ -25,12 +27,12 @@ export function PayslipLeaveFields({
   return (
     <>
       <div>
-        <label htmlFor="vacationDays" className={labelClass}>
+        <label htmlFor={`${idPrefix}vacationDays`} className={labelClass}>
           יתרת חופשה
         </label>
         <input
-          id="vacationDays"
-          name="vacationDays"
+          id={`${idPrefix}vacationDays`}
+          name={`${idPrefix}vacationDays`}
           type="number"
           inputMode="decimal"
           min={0}
@@ -47,12 +49,12 @@ export function PayslipLeaveFields({
         </p>
       </div>
       <div>
-        <label htmlFor="sickDays" className={labelClass}>
+        <label htmlFor={`${idPrefix}sickDays`} className={labelClass}>
           יתרת מחלה
         </label>
         <input
-          id="sickDays"
-          name="sickDays"
+          id={`${idPrefix}sickDays`}
+          name={`${idPrefix}sickDays`}
           type="number"
           inputMode="decimal"
           min={0}

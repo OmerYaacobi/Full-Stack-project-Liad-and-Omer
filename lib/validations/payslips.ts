@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const MAX_PAYSLIP_BYTES = 10_485_760;
+export const MAX_PAYSLIP_BATCH = 30;
 
 export const MONTHS = [
   { value: 1, label: "January" },
