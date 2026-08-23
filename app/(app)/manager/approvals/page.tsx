@@ -21,13 +21,13 @@ export default async function ManagerApprovalsPage() {
     <>
       <PageHeader
         title="Approvals"
-        description="Time-off requests from people who report to you. A warning appears when someone else on the team is already away."
+        description="Time-off requests from people at this business. A warning appears when someone else on the team is already away."
       />
 
       {pending.length === 0 ? (
         <EmptyState
-          title="Nothing is waiting on you"
-          description="When a direct report requests time off, it shows up here. Assign yourself as their line manager on the business roster if you expect to see someone."
+            title="Nothing is waiting on you"
+            description="When someone at this business requests time off, it shows up here. You can approve it even if you are not listed as their line manager."
         />
       ) : (
         <div className="space-y-4">

@@ -33,6 +33,7 @@ export function ApprovalCard({ request }: { request: PendingApproval }) {
             {request.employeeName ?? "Employee"} · {request.leaveTypeName}
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
+            {request.companyName ? `${request.companyName} · ` : ""}
             {formatDateRange(request.startDate, request.endDate)} ·{" "}
             {formatDays(request.workingDays)}
             {request.remainingAfter !== null

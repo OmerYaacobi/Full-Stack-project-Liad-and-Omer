@@ -62,7 +62,7 @@ export default async function ManagerOverviewPage() {
         {pending.length === 0 ? (
           <EmptyState
             title="Nothing is waiting on you"
-            description="Time-off requests from your direct reports appear here, with a warning when someone else on the team is already away on those dates."
+            description="When someone at this business requests time off, it appears here so you can approve or reject it."
           />
         ) : (
           <div className="space-y-4">

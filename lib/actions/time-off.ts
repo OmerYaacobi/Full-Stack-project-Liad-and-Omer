@@ -60,6 +60,8 @@ export type TimeOffRequest = {
   decisionNote: string | null;
   employeeId: string;
   employeeName?: string | null;
+  companyId: string;
+  companyName?: string | null;
   attachments: TimeOffAttachment[];
 };
 
@@ -401,34 +403,54 @@ export async function rejectTimeOffRequest(
 }
 
 export async function listPendingApprovals(
-  membershipId: string,
-  companyId: string,
+  membershipId: string | null,
+  companyId?: string | null,
 ): Promise<PendingApproval[]> {
-  const managerId = await getMyEmployeeId(membershipId);
-  if (!managerId) return [];
+  const ownId = membershipId ? await getMyEmployeeId(membershipId) : null;
+  return buildPendingApprovals({
+    companyId: companyId ?? undefined,
+    excludeEmployeeId: ownId,
+  });
+}
 
-  const supabase = await createClient();
-  const pending = await listRequests({ status: "pending" });
-  const mine = pending.filter((row) => row.employeeId !== managerId);
-  if (mine.length === 0) return [];
+export async function listFirmPendingApprovals(): Promise<PendingApproval[]> {
+  return buildPendingApprovals({});
+}
 
-  const teamIds = [...new Set(mine.map((row) => row.employeeId))];
-  const teamRequests = await listRequests({ employeeIds: teamIds });
+async function buildPendingApprovals(filter: {
+  companyId?: string;
+  excludeEmployeeId?: string | null;
+}): Promise<PendingApproval[]> {
+  const pending = await listRequests({
+    status: "pending",
+    companyId: filter.companyId,
+  });
+  const visible = filter.excludeEmployeeId
+    ? pending.filter((row) => row.employeeId !== filter.excludeEmployeeId)
+    : pending;
+  if (visible.length === 0) return [];
+
+  const teamIds = [...new Set(visible.map((row) => row.employeeId))];
+  const teamRequests = await listRequests({
+    employeeIds: teamIds,
+    companyId: filter.companyId,
+  });
   const active = teamRequests.filter(
     (row) => row.status === "pending" || row.status === "approved",
   );
 
   const balancesByEmployee = new Map<string, LeaveBalance[]>();
   await Promise.all(
-    teamIds.map(async (employeeId) => {
+    visible.map(async (row) => {
+      if (balancesByEmployee.has(row.employeeId)) return;
       balancesByEmployee.set(
-        employeeId,
-        await listEmployeeLeaveBalances(companyId, employeeId),
+        row.employeeId,
+        await listEmployeeLeaveBalances(row.companyId, row.employeeId),
       );
     }),
   );
 
-  return mine.map((request) => {
+  return visible.map((request) => {
     const balance = (balancesByEmployee.get(request.employeeId) ?? []).find(
       (row) => row.leaveTypeId === request.leaveTypeId,
     );
@@ -437,6 +459,7 @@ export async function listPendingApprovals(
         (other) =>
           other.id !== request.id &&
           other.employeeId !== request.employeeId &&
+          other.companyId === request.companyId &&
           rangesOverlap(
             request.startDate,
             request.endDate,
@@ -453,10 +476,9 @@ export async function listPendingApprovals(
 
     return {
       ...request,
-      remainingAfter:
-        balance?.tracksBalance
-          ? roundDays(balance.availableDays)
-          : null,
+      remainingAfter: balance?.tracksBalance
+        ? roundDays(balance.availableDays)
+        : null,
       overlaps,
     };
   });
@@ -624,18 +646,20 @@ async function workingDaysFor(
 async function listRequests(filter: {
   employeeId?: string;
   employeeIds?: string[];
+  companyId?: string;
   status?: string;
 }): Promise<TimeOffRequest[]> {
   const supabase = await createClient();
   let query = supabase
     .from("time_off_requests")
     .select(
-      "id, leave_type_id, start_date, end_date, working_days, reason, status, created_at, decided_at, decision_note, employee_id, leave_types(name), employees(full_name)",
+      "id, company_id, leave_type_id, start_date, end_date, working_days, reason, status, created_at, decided_at, decision_note, employee_id, leave_types(name), employees(full_name), companies(name)",
     )
     .order("created_at", { ascending: false });
 
   if (filter.employeeId) query = query.eq("employee_id", filter.employeeId);
   if (filter.employeeIds) query = query.in("employee_id", filter.employeeIds);
+  if (filter.companyId) query = query.eq("company_id", filter.companyId);
   if (filter.status) query = query.eq("status", filter.status);
 
   const { data, error } = await query;
@@ -651,6 +675,9 @@ async function listRequests(filter: {
     const employee = Array.isArray(row.employees)
       ? row.employees[0]
       : row.employees;
+    const company = Array.isArray(row.companies)
+      ? row.companies[0]
+      : row.companies;
     return {
       id: row.id,
       leaveTypeId: row.leave_type_id,
@@ -665,6 +692,8 @@ async function listRequests(filter: {
       decisionNote: row.decision_note,
       employeeId: row.employee_id,
       employeeName: employee?.full_name ?? null,
+      companyId: row.company_id,
+      companyName: company?.name ?? null,
       attachments: attachmentsByRequest.get(row.id) ?? [],
     };
   });
@@ -743,6 +772,8 @@ function revalidateTimeOff(companyId?: string) {
   revalidatePath("/manager");
   revalidatePath("/manager/approvals");
   revalidatePath("/manager/team");
+  revalidatePath("/bookkeeper");
+  revalidatePath("/bookkeeper/approvals");
   if (companyId) {
     revalidatePath(`/bookkeeper/businesses/${companyId}`);
   }
@@ -759,7 +790,7 @@ function mapTimeOffError(error: { code?: string; message?: string }): ActionResu
     return fail("CONFLICT", "This request was already decided.");
   }
   if (/NOT_YOUR_TEAM/i.test(message)) {
-    return fail("FORBIDDEN", "You can only decide requests for your direct reports.");
+    return fail("FORBIDDEN", "You can only decide time-off for people at this business.");
   }
   if (/CANNOT_CANCEL_DECIDED/i.test(message)) {
     return fail("CONFLICT", "Only a pending request can be cancelled.");

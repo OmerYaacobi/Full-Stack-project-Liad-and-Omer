@@ -43,6 +43,7 @@ const BOOKKEEPER: NavGroup = {
   title: "Bookkeeping",
   items: [
     { href: "/bookkeeper", label: "What needs attention" },
+    { href: "/bookkeeper/approvals", label: "Approvals" },
     { href: "/bookkeeper/businesses", label: "Businesses" },
     { href: "/bookkeeper/periods", label: "Payroll periods", soon: true },
     { href: "/bookkeeper/employees", label: "Employees", soon: true },

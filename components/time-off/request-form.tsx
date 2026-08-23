@@ -215,7 +215,7 @@ export function TimeOffRequestForm({
       )}
       {state?.ok && (
         <p role="status" className="mt-3 text-sm text-emerald-700">
-          Request sent. It stays pending until your manager decides.
+          Request sent. It stays pending until a manager or bookkeeper decides.
         </p>
       )}
 
