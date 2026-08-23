@@ -114,7 +114,7 @@ export default function InviteSignupPage() {
       if (error) {
         setGeneralError(
           error.message === "User already registered"
-            ? "A user with this email address is already registered."
+            ? "This email already has an account. Employee access needs its own email — sign in with that account, or register the invite with a different address."
             : `Registration error: ${error.message}`,
         );
         return;
@@ -180,10 +180,10 @@ export default function InviteSignupPage() {
           <span className="font-semibold text-slate-900">{formData.email}</span>.
         </p>
         <Link
-          href="/"
+          href="/login"
           className="inline-flex justify-center items-center px-6 py-2.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition text-sm"
         >
-          Return to Home
+          Sign in
         </Link>
       </div>
     );

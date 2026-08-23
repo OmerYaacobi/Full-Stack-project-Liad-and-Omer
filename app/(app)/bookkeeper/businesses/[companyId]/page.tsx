@@ -1,0 +1,99 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { DocumentUploadForm } from "@/components/documents/document-upload-form";
+import { InvitePeoplePanel } from "@/components/invites/invite-people-panel";
+import { EmptyState } from "@/components/shared/empty-state";
+import { PageHeader } from "@/components/shared/page-header";
+import { countDocumentsByEmployee } from "@/lib/actions/documents";
+import { listCompanyEmployees } from "@/lib/actions/employees";
+import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = {
+  title: "Business documents",
+};
+
+export default async function BusinessPage({
+  params,
+}: {
+  params: Promise<{ companyId: string }>;
+}) {
+  const { companyId } = await params;
+  const supabase = await createClient();
+
+  // RLS already limits companies to those the caller's firm manages, so an id
+  // belonging to someone else's client comes back empty rather than forbidden.
+  const { data: company } = await supabase
+    .from("companies")
+    .select("id, name, tax_id")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (!company) notFound();
+
+  const [employees, perEmployeeCounts] = await Promise.all([
+    listCompanyEmployees(companyId),
+    countDocumentsByEmployee(companyId),
+  ]);
+
+  return (
+    <>
+      <nav className="mb-4 text-sm text-slate-500">
+        <Link href="/bookkeeper/businesses" className="hover:text-slate-900">
+          Businesses
+        </Link>
+        <span className="mx-2 text-slate-300">/</span>
+        <span className="text-slate-700">{company.name}</span>
+      </nav>
+
+      <PageHeader
+        title={company.name}
+        description={`Tax ID ${company.tax_id}`}
+      />
+
+      <InvitePeoplePanel companyId={company.id} companyName={company.name} />
+
+      {employees.length > 0 && (
+        <div className="mt-8">
+          <DocumentUploadForm companyId={companyId} employees={employees} />
+        </div>
+      )}
+
+      <div className="mt-8 space-y-4">
+        <h2 className="text-sm font-medium text-slate-900">People</h2>
+        {employees.length === 0 ? (
+          <EmptyState
+            title="Nobody on the payroll yet"
+            description="Create an invitation link above. When they open it and choose a password, they appear here."
+          />
+        ) : (
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+            {employees.map((employee) => (
+              <li key={employee.id}>
+                <Link
+                  href={`/bookkeeper/businesses/${companyId}/employees/${employee.id}`}
+                  className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-slate-50"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-900">
+                      {employee.fullName}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {employee.role === "manager" ? "Manager" : "Employee"}
+                      {" · "}#{employee.employeeNumber}
+                      {employee.jobTitle ? ` · ${employee.jobTitle}` : ""}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">
+                    {perEmployeeCounts[employee.id] ?? 0}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
+  );
+}

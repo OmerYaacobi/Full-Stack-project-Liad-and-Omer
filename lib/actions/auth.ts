@@ -52,23 +52,40 @@ async function signInWithPassword(
 }
 
 /**
- * Bookkeepers hold a firm membership rather than a company one, so they have no
- * role home in the app shell and belong on the firm dashboard instead.
+ * Uses the client that just established the session, not getContext — that
+ * helper is cached per request and would still see the pre-login user.
+ *
+ * Prefer an employee or manager membership over a leftover bookkeeper one, and
+ * only send someone to the firm home when they have a firm and no company role.
+ * The old fallback was /dashboard, which is why an employee with no membership
+ * row yet looked like a bookkeeper.
  */
 async function landingFor(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<string> {
-  const { data } = await supabase
-    .from("memberships")
-    .select("role")
-    .eq("profile_id", userId)
-    .eq("is_active", true)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const [{ data: memberships }, { data: firm }] = await Promise.all([
+    supabase
+      .from("memberships")
+      .select("role")
+      .eq("profile_id", userId)
+      .eq("is_active", true),
+    supabase
+      .from("firm_memberships")
+      .select("id")
+      .eq("profile_id", userId)
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
-  return data?.role ? roleHome(data.role as AppRole) : "/dashboard";
+  const companyRole =
+    memberships?.find((row) => row.role !== "bookkeeper")?.role ??
+    memberships?.[0]?.role;
+
+  if (companyRole) return roleHome(companyRole as AppRole);
+  if (firm) return "/bookkeeper";
+  return "/no-access";
 }
 
 async function sendMagicLink(

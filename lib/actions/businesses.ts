@@ -32,8 +32,11 @@ async function resolveUserFirm(supabase: any, user: any) {
     return { firmId: firmMembership.firm_id, firm };
   }
 
-  // 2. Self-heal: If firm is missing, provision it from metadata
+  // Only bookkeeper signups carry a firm. Inventing one for an employee would
+  // drop them on the firm dashboard the next time they hit /dashboard.
   const meta = user.user_metadata || {};
+  if (meta.signup_type !== "bookkeeper") return null;
+
   const firmName = meta.firm_name || "My Bookkeeping Firm";
   const taxId = meta.tax_id || `FIRMTID-${user.id.slice(0, 8)}`;
 

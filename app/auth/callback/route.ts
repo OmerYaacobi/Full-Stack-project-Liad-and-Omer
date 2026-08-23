@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getContext, roleHome } from "@/lib/auth/context";
+import { getContext, homeFor } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -28,8 +28,7 @@ export async function GET(request: NextRequest) {
       : null;
 
   const ctx = await getContext();
-  const destination =
-    next ?? (ctx?.membership ? roleHome(ctx.membership.role) : "/no-access");
+  const destination = next ?? (ctx ? homeFor(ctx) : "/no-access");
 
   return NextResponse.redirect(`${origin}${destination}`);
 }

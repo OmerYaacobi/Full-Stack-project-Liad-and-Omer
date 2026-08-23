@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { createClient } from "@/lib/supabase/server";
 import {
   createInvitationSchema,
@@ -40,6 +42,8 @@ export async function createInvitationLink(input: CreateInvitationInput) {
   if (error) {
     return { ok: false, error: error.message };
   }
+
+  revalidatePath(`/bookkeeper/businesses/${parsed.data.companyId}`);
 
   return {
     ok: true,

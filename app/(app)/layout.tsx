@@ -1,20 +1,22 @@
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { requireMembership } from "@/lib/auth/context";
+import { requireWorkspace } from "@/lib/auth/context";
+import { devAuthRole } from "@/lib/auth/dev-auth";
 
 /**
  * Resolves identity once per request and hands it to the shell, so no page
  * below repeats the auth round trip.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const ctx = await requireMembership();
+  const ctx = await requireWorkspace();
 
   return (
     <AppShell
-      membership={ctx.membership}
+      workspace={ctx.workspace}
       profile={ctx.profile}
       email={ctx.email}
+      impersonating={devAuthRole() !== null}
     >
       {children}
     </AppShell>

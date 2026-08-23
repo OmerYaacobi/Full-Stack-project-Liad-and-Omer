@@ -1,13 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { devAuthRole } from "@/lib/auth/dev-auth";
 import { updateSession } from "@/lib/supabase/session";
 
 // Reachable without a session. Everything else redirects to /login.
-const PUBLIC_PATHS = ["/login", "/verify", "/auth"];
+const PUBLIC_PATHS = ["/login", "/verify", "/auth", "/signup", "/invite"];
 
 export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
+
+  // Unauthenticated requests may still proceed while impersonating a role for
+  // local UI work. A real session is never skipped: that was sending every
+  // signed-in employee to the bookkeeper shell.
+  if (!user && devAuthRole()) return response;
 
   const isPublic = PUBLIC_PATHS.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 interface BusinessCardProps {
   business: {
     id: string;
@@ -55,6 +57,13 @@ export function BusinessCard({ business, onInvite }: BusinessCardProps) {
 
       {/* Actions */}
       <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+        <Link
+          href={`/bookkeeper/businesses/${business.id}`}
+          className="flex-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+        >
+          <span>📁</span>
+          <span>Open Files</span>
+        </Link>
         <button
           type="button"
           onClick={() => onInvite({ id: business.id, name: business.name })}

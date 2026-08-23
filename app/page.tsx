@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { getContext, roleHome } from "@/lib/auth/context";
+import { getContext, homeFor } from "@/lib/auth/context";
 
 export default async function Home() {
   const ctx = await getContext();
   if (ctx) {
-    redirect(ctx.membership ? roleHome(ctx.membership.role) : "/no-access");
+    redirect(homeFor(ctx));
   }
 
   return (
