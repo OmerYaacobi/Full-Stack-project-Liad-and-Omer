@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getMyEmployeeId } from "@/lib/actions/employees";
+import { getMyEmployee, getMyEmployeeId } from "@/lib/actions/employees";
 import { fail, fromZod, ok, type ActionResult } from "@/lib/actions/result";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -11,6 +11,8 @@ import {
   type AllowedDocumentType,
   uploadDocumentSchema,
 } from "@/lib/validations/documents";
+import { uploadOwnForm101Schema } from "@/lib/validations/form-101";
+import { requireMembership } from "@/lib/auth/context";
 
 const BUCKET = "documents";
 
@@ -95,6 +97,97 @@ export async function uploadDocument(
   revalidatePath("/manager/shared");
   revalidatePath(`/bookkeeper/businesses/${companyId}/employees/${employeeId}`);
   return ok(undefined);
+}
+
+export async function storeEmployeeForm101(input: {
+  companyId: string;
+  employeeId: string;
+  taxYear: number;
+  title: string;
+  bytes: Uint8Array;
+  uploadedBy: string;
+}): Promise<ActionResult<void>> {
+  const supabase = await createClient();
+  const path = `${input.companyId}/${input.employeeId}/form_101/${crypto.randomUUID()}.pdf`;
+
+  const upload = await supabase.storage.from(BUCKET).upload(path, input.bytes, {
+    contentType: "application/pdf",
+    upsert: false,
+  });
+  if (upload.error) {
+    return fail("INTERNAL", storageMessage(upload.error.message));
+  }
+
+  const { error: insertError } = await supabase.from("documents").insert({
+    company_id: input.companyId,
+    employee_id: input.employeeId,
+    kind: "form_101",
+    title: input.title,
+    tax_year: input.taxYear,
+    file_path: path,
+    file_size: input.bytes.byteLength,
+    uploaded_by: input.uploadedBy,
+    visible_to_managers: true,
+  });
+
+  if (insertError) {
+    await supabase.storage.from(BUCKET).remove([path]);
+    return fail("INTERNAL", "The file uploaded but could not be recorded. Try again.");
+  }
+
+  revalidateForm101(input.companyId, input.employeeId);
+  return ok(undefined);
+}
+
+export async function uploadOwnForm101(
+  _previous: ActionResult<void> | null,
+  formData: FormData,
+): Promise<ActionResult<void>> {
+  const parsed = uploadOwnForm101Schema.safeParse({
+    taxYear: formData.get("taxYear"),
+  });
+  if (!parsed.success) return fromZod(parsed.error);
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return fail("VALIDATION", "Choose the completed Form 101 file.", {
+      file: ["Choose the completed Form 101 file."],
+    });
+  }
+
+  const fileError = await checkFile(file);
+  if (fileError) return fail("VALIDATION", fileError, { file: [fileError] });
+
+  const ctx = await requireMembership();
+  const employee = await getMyEmployee(ctx.membership.id, ctx.membership.company.id);
+  if (!employee) {
+    return fail("FORBIDDEN", "You need an employee record at this business to file Form 101.");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return fail("UNAUTHENTICATED", "Your session has expired. Sign in again.");
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return storeEmployeeForm101({
+    companyId: ctx.membership.company.id,
+    employeeId: employee.id,
+    taxYear: parsed.data.taxYear,
+    title: `Form 101 — ${parsed.data.taxYear}`,
+    bytes,
+    uploadedBy: user.id,
+  });
+}
+
+function revalidateForm101(companyId: string, employeeId: string) {
+  revalidatePath("/employee");
+  revalidatePath("/employee/documents");
+  revalidatePath("/employee/documents/form-101");
+  revalidatePath("/manager/shared");
+  revalidatePath(`/bookkeeper/businesses/${companyId}`);
+  revalidatePath(`/bookkeeper/businesses/${companyId}/employees/${employeeId}`);
 }
 
 /**

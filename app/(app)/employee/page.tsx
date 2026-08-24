@@ -88,17 +88,25 @@ export default async function EmployeeDashboardPage() {
       <div className="mt-8 space-y-4">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="text-sm font-medium text-slate-900">Documents</h2>
-          <Link
-            href="/employee/documents"
-            className="text-xs font-medium text-slate-500 hover:text-slate-900"
-          >
-            See all
-          </Link>
+          <div className="flex gap-3">
+            <Link
+              href="/employee/documents/form-101"
+              className="text-xs font-medium text-slate-500 hover:text-slate-900"
+            >
+              Form 101
+            </Link>
+            <Link
+              href="/employee/documents"
+              className="text-xs font-medium text-slate-500 hover:text-slate-900"
+            >
+              See all
+            </Link>
+          </div>
         </div>
         {recent.length === 0 ? (
           <EmptyState
             title="No documents yet"
-            description="When your bookkeeper files a form or contract for you, it appears here."
+            description="When your bookkeeper files a form or contract for you, it appears here. You can also upload Form 101 yourself."
           />
         ) : (
           <DocumentFolders documents={recent} />

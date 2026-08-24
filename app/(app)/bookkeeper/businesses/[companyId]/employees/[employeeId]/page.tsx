@@ -10,6 +10,7 @@ import { PayslipList } from "@/components/payslips/payslip-list";
 import { PayslipUploadForm } from "@/components/payslips/payslip-upload-form";
 import { PageHeader } from "@/components/shared/page-header";
 import { listCompanyDocuments } from "@/lib/actions/documents";
+import { companyHasForm101ForYear } from "@/lib/actions/form-101";
 import {
   ensureEmployeeEntitlements,
   getCompanyEmployee,
@@ -41,9 +42,11 @@ export default async function EmployeeDocumentsPage({
 
   await ensureEmployeeEntitlements(companyId, employeeId, employee.startDate);
 
-  const [documents, payslips] = await Promise.all([
+  const taxYear = new Date().getFullYear();
+  const [documents, payslips, hasForm101] = await Promise.all([
     listCompanyDocuments(companyId, employeeId),
     listEmployeePayslips(companyId, employeeId),
+    companyHasForm101ForYear(companyId, employeeId, taxYear),
   ]);
 
   return (
@@ -82,7 +85,13 @@ export default async function EmployeeDocumentsPage({
           This person is off the payroll. They cannot sign in. Files below stay
           for history.
         </p>
-      ) : null}
+      ) : (
+        <p className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          {hasForm101
+            ? `Form 101 for ${taxYear} is on file in the Form 101 folder.`
+            : `No Form 101 for ${taxYear} yet. They can fill it on the Form 101 site, save the PDF, and upload it here. You can also upload a completed file below. It is optional if they already gave it to payroll.`}
+        </p>
+      )}
 
       {employee.status !== "terminated" ? (
         <AssignManagerForm

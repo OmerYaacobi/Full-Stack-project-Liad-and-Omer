@@ -100,6 +100,15 @@ export async function getMyEmployeeId(
   return data.id;
 }
 
+export async function getMyEmployee(
+  membershipId: string,
+  companyId: string,
+): Promise<CompanyEmployee | null> {
+  const employeeId = await getMyEmployeeId(membershipId);
+  if (!employeeId) return null;
+  return getCompanyEmployee(companyId, employeeId);
+}
+
 export async function getCompanyEmployee(
   companyId: string,
   employeeId: string,
