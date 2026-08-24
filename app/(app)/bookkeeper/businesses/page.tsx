@@ -35,10 +35,13 @@ export default async function BusinessesPage() {
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
           {businesses.map((business) => (
-            <li key={business.id}>
+            <li
+              key={business.id}
+              className="rounded-xl border border-slate-200 bg-white p-4"
+            >
               <Link
                 href={`/bookkeeper/businesses/${business.id}`}
-                className="block rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 hover:bg-slate-50"
+                className="block transition-colors hover:border-slate-300"
               >
                 <p className="font-medium text-slate-900">{business.name}</p>
                 <p className="mt-0.5 text-xs text-slate-500">

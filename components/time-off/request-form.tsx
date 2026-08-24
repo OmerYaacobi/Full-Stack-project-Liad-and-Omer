@@ -23,10 +23,15 @@ export function TimeOffRequestForm({
   const [leaveTypeId, setLeaveTypeId] = useState(balances[0]?.leaveTypeId ?? "");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [useRemaining, setUseRemaining] = useState(false);
   const [preview, setPreview] = useState<TimeOffPreview | null>(null);
 
   const selected = balances.find((row) => row.leaveTypeId === leaveTypeId);
+  const canUseRemaining =
+    Boolean(selected?.tracksBalance) && (selected?.availableDays ?? 0) > 0;
+  const remainingDays = selected?.availableDays ?? 0;
   const insufficient =
+    !useRemaining &&
     Boolean(preview) &&
     Boolean(selected?.tracksBalance) &&
     preview !== null &&
@@ -43,12 +48,17 @@ export function TimeOffRequestForm({
       formRef.current?.reset();
       setStartDate("");
       setEndDate("");
+      setUseRemaining(false);
       setPreview(null);
     }
   }, [state]);
 
   useEffect(() => {
-    if (!leaveTypeId || !startDate || !endDate || endDate < startDate) {
+    if (!canUseRemaining && useRemaining) setUseRemaining(false);
+  }, [canUseRemaining, useRemaining]);
+
+  useEffect(() => {
+    if (useRemaining || !leaveTypeId || !startDate || !endDate || endDate < startDate) {
       setPreview(null);
       return;
     }
@@ -65,9 +75,12 @@ export function TimeOffRequestForm({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [leaveTypeId, startDate, endDate]);
+  }, [leaveTypeId, startDate, endDate, useRemaining]);
 
   const previewText = useMemo(() => {
+    if (useRemaining && selected?.tracksBalance) {
+      return `This uses all ${formatDays(remainingDays)} remaining, including leftover half-days. You will have 0 days left.`;
+    }
     if (!preview) return null;
     if (preview.workingDays === 0) {
       return "Those dates contain no working days (weekends or holidays).";
@@ -80,7 +93,7 @@ export function TimeOffRequestForm({
       return `${calendar}. You only have ${formatDays(preview.availableDays ?? 0)} available.`;
     }
     return `${calendar}. You will have ${formatDays(preview.remainingDays)} remaining.`;
-  }, [preview]);
+  }, [preview, remainingDays, selected?.tracksBalance, useRemaining]);
 
   if (balances.length === 0) return null;
 
@@ -121,44 +134,73 @@ export function TimeOffRequestForm({
           <FieldError messages={fieldErrors?.leaveTypeId} />
         </div>
 
-        <div>
-          <label htmlFor="startDate" className="block text-sm font-medium text-slate-700">
-            From
+        {canUseRemaining ? (
+          <label className="sm:col-span-2 flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              name="useRemaining"
+              value="on"
+              checked={useRemaining}
+              onChange={(event) => setUseRemaining(event.target.checked)}
+              disabled={pending}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-slate-900">
+                Use all remaining {selected?.name.toLowerCase() ?? "leave"}
+                {" · "}
+                {formatDays(remainingDays)}
+              </span>
+              <span className="mt-0.5 block text-xs text-slate-500">
+                Spends the full remaining balance, including leftover half-days.
+                No dates needed.
+              </span>
+            </span>
           </label>
-          <input
-            id="startDate"
-            name="startDate"
-            type="date"
-            required
-            value={startDate}
-            onChange={(event) => {
-              const next = event.target.value;
-              setStartDate(next);
-              if (endDate && endDate < next) setEndDate(next);
-            }}
-            disabled={pending}
-            className={FIELD}
-          />
-          <FieldError messages={fieldErrors?.startDate} />
-        </div>
+        ) : null}
 
-        <div>
-          <label htmlFor="endDate" className="block text-sm font-medium text-slate-700">
-            Through
-          </label>
-          <input
-            id="endDate"
-            name="endDate"
-            type="date"
-            required
-            value={endDate}
-            min={startDate || undefined}
-            onChange={(event) => setEndDate(event.target.value)}
-            disabled={pending}
-            className={FIELD}
-          />
-          <FieldError messages={fieldErrors?.endDate} />
-        </div>
+        {!useRemaining ? (
+          <>
+            <div>
+              <label htmlFor="startDate" className="block text-sm font-medium text-slate-700">
+                From
+              </label>
+              <input
+                id="startDate"
+                name="startDate"
+                type="date"
+                required
+                value={startDate}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setStartDate(next);
+                  if (endDate && endDate < next) setEndDate(next);
+                }}
+                disabled={pending}
+                className={FIELD}
+              />
+              <FieldError messages={fieldErrors?.startDate} />
+            </div>
+
+            <div>
+              <label htmlFor="endDate" className="block text-sm font-medium text-slate-700">
+                Through
+              </label>
+              <input
+                id="endDate"
+                name="endDate"
+                type="date"
+                required
+                value={endDate}
+                min={startDate || undefined}
+                onChange={(event) => setEndDate(event.target.value)}
+                disabled={pending}
+                className={FIELD}
+              />
+              <FieldError messages={fieldErrors?.endDate} />
+            </div>
+          </>
+        ) : null}
 
         <div className="sm:col-span-2">
           <label htmlFor="reason" className="block text-sm font-medium text-slate-700">
@@ -221,10 +263,19 @@ export function TimeOffRequestForm({
 
       <button
         type="submit"
-        disabled={pending || insufficient || preview?.workingDays === 0}
+        disabled={
+          pending ||
+          insufficient ||
+          (!useRemaining && preview?.workingDays === 0) ||
+          (useRemaining && remainingDays <= 0)
+        }
         className="mt-4 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
       >
-        {pending ? "Sending…" : "Submit request"}
+        {pending
+          ? "Sending…"
+          : useRemaining
+            ? "Request remaining days"
+            : "Submit request"}
       </button>
     </form>
   );

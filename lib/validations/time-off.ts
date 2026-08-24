@@ -29,17 +29,61 @@ function withDateOrder<T extends z.ZodType<{ startDate: string; endDate: string 
 
 export const previewTimeOffSchema = withDateOrder(timeOffDates);
 
-export const timeOffRequestSchema = withDateOrder(
-  timeOffDates.extend({
-    reason: z
-      .union([
-        z.string().trim().max(500, "Keep the reason under 500 characters."),
-        z.literal(""),
-      ])
+const reasonField = z
+  .union([
+    z.string().trim().max(500, "Keep the reason under 500 characters."),
+    z.literal(""),
+  ])
+  .optional()
+  .transform((value) => (value ? value : undefined));
+
+export const timeOffRequestSchema = z
+  .object({
+    leaveTypeId: z.string().uuid("Pick a leave type."),
+    useRemaining: z
+      .union([z.literal("on"), z.literal("true"), z.literal(""), z.null()])
       .optional()
-      .transform((value) => (value ? value : undefined)),
-  }),
-);
+      .transform((value) => value === "on" || value === "true"),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    reason: reasonField,
+  })
+  .superRefine((value, ctx) => {
+    if (value.useRemaining) return;
+    if (!value.startDate || !isIsoDate(value.startDate)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Pick a valid date.",
+        path: ["startDate"],
+      });
+    }
+    if (!value.endDate || !isIsoDate(value.endDate)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Pick a valid date.",
+        path: ["endDate"],
+      });
+      return;
+    }
+    if (value.startDate && value.endDate < value.startDate) {
+      ctx.addIssue({
+        code: "custom",
+        message: "End date must be on or after the start date.",
+        path: ["endDate"],
+      });
+    }
+    if (
+      value.startDate &&
+      isIsoDate(value.startDate) &&
+      calendarSpanDays(value.startDate, value.endDate) > 90
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Requests longer than 90 days need to be arranged directly.",
+        path: ["endDate"],
+      });
+    }
+  });
 
 export type TimeOffRequestInput = z.infer<typeof timeOffRequestSchema>;
 

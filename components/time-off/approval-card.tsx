@@ -9,7 +9,7 @@ import {
 } from "@/lib/actions/time-off";
 import { RequestStatusBadge } from "@/components/time-off/status-badge";
 import { TimeOffAttachmentLink } from "@/components/time-off/attachment-link";
-import { formatDateRange, formatDays } from "@/lib/format";
+import { formatDateRange, formatDays, formatTimeOffWhen } from "@/lib/format";
 
 export function ApprovalCard({ request }: { request: PendingApproval }) {
   const [pending, start] = useTransition();
@@ -34,8 +34,9 @@ export function ApprovalCard({ request }: { request: PendingApproval }) {
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
             {request.companyName ? `${request.companyName} · ` : ""}
-            {formatDateRange(request.startDate, request.endDate)} ·{" "}
+            {formatTimeOffWhen(request)} ·{" "}
             {formatDays(request.workingDays)}
+            {request.unscheduled ? " (all remaining)" : ""}
             {request.remainingAfter !== null
               ? ` · ${formatDays(request.remainingAfter)} left if you approve`
               : ""}

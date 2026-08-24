@@ -15,6 +15,10 @@ const setEmployeeManagerSchema = z.object({
     .transform((value) => (value === "" ? null : value)),
 });
 
+const employeeIdSchema = z.object({
+  employeeId: z.string().uuid(),
+});
+
 export type CompanyEmployee = {
   id: string;
   fullName: string;
@@ -71,7 +75,9 @@ export async function listCompanyManagers(
   companyId: string,
 ): Promise<CompanyEmployee[]> {
   const employees = await listCompanyEmployees(companyId);
-  return employees.filter((row) => row.role === "manager");
+  return employees.filter(
+    (row) => row.role === "manager" && row.status !== "terminated",
+  );
 }
 
 /**
@@ -142,6 +148,110 @@ export async function setEmployeeManager(
   revalidatePath("/manager");
   revalidatePath("/manager/team");
   revalidatePath("/manager/approvals");
+  return ok(undefined);
+}
+
+export type ClaimableTeammate = {
+  id: string;
+  fullName: string;
+  jobTitle: string | null;
+  managerName: string | null;
+};
+
+/**
+ * People at this business who do not already report to the signed-in manager.
+ * Used so a manager can add reports without waiting on a bookkeeper.
+ */
+export async function listClaimableTeammates(
+  companyId: string,
+  managerEmployeeId: string,
+): Promise<ClaimableTeammate[]> {
+  const people = await listCompanyEmployees(companyId);
+  return people
+    .filter(
+      (row) =>
+        row.id !== managerEmployeeId &&
+        row.managerId !== managerEmployeeId &&
+        row.status !== "terminated",
+    )
+    .map((row) => ({
+      id: row.id,
+      fullName: row.fullName,
+      jobTitle: row.jobTitle,
+      managerName: row.managerName,
+    }));
+}
+
+export async function claimDirectReport(
+  employeeId: string,
+): Promise<ActionResult<void>> {
+  const parsed = employeeIdSchema.safeParse({ employeeId });
+  if (!parsed.success) return fromZod(parsed.error);
+
+  const supabase = await createClient();
+  const { data: employee } = await supabase
+    .from("employees")
+    .select("id, company_id")
+    .eq("id", parsed.data.employeeId)
+    .maybeSingle();
+
+  const { error } = await supabase.rpc("claim_direct_report", {
+    p_employee_id: parsed.data.employeeId,
+  });
+  if (error) return mapPeopleError(error);
+
+  revalidateTeamPaths(employee?.company_id ?? null);
+  revalidatePath(`/manager/team/${parsed.data.employeeId}`);
+  return ok(undefined);
+}
+
+export async function removeDirectReport(
+  employeeId: string,
+): Promise<ActionResult<void>> {
+  const parsed = employeeIdSchema.safeParse({ employeeId });
+  if (!parsed.success) return fromZod(parsed.error);
+
+  const supabase = await createClient();
+  const { data: employee } = await supabase
+    .from("employees")
+    .select("id, company_id")
+    .eq("id", parsed.data.employeeId)
+    .maybeSingle();
+
+  const { error } = await supabase.rpc("remove_direct_report", {
+    p_employee_id: parsed.data.employeeId,
+  });
+  if (error) return mapPeopleError(error);
+
+  revalidateTeamPaths(employee?.company_id ?? null);
+  revalidatePath(`/manager/team/${parsed.data.employeeId}`);
+  return ok(undefined);
+}
+
+export async function terminateEmployee(
+  employeeId: string,
+): Promise<ActionResult<void>> {
+  const parsed = employeeIdSchema.safeParse({ employeeId });
+  if (!parsed.success) return fromZod(parsed.error);
+
+  const supabase = await createClient();
+  const { data: employee } = await supabase
+    .from("employees")
+    .select("id, company_id")
+    .eq("id", parsed.data.employeeId)
+    .maybeSingle();
+
+  const { error } = await supabase.rpc("terminate_employee", {
+    p_employee_id: parsed.data.employeeId,
+  });
+  if (error) return mapPeopleError(error);
+
+  revalidateTeamPaths(employee?.company_id ?? null);
+  if (employee?.company_id) {
+    revalidatePath(`/bookkeeper/businesses/${employee.company_id}/employees/${employee.id}`);
+    revalidatePath("/bookkeeper");
+    revalidatePath("/bookkeeper/periods");
+  }
   return ok(undefined);
 }
 
@@ -260,4 +370,36 @@ function membershipRole(
   const row = Array.isArray(memberships) ? memberships[0] : memberships;
   if (row?.role === "manager" || row?.role === "employee") return row.role;
   return null;
+}
+
+function revalidateTeamPaths(companyId: string | null) {
+  revalidatePath("/manager");
+  revalidatePath("/manager/team");
+  revalidatePath("/manager/approvals");
+  if (companyId) {
+    revalidatePath(`/bookkeeper/businesses/${companyId}`);
+  }
+}
+
+function mapPeopleError(error: { code?: string; message?: string }): ActionResult<never> {
+  const message = error.message ?? "";
+  if (/NOT_THEIR_MANAGER/i.test(message)) {
+    return fail("FORBIDDEN", "You can only remove people who report to you.");
+  }
+  if (/CANNOT_MANAGE_SELF/i.test(message)) {
+    return fail("VALIDATION", "You cannot add yourself as a report.");
+  }
+  if (/NOT_A_MANAGER/i.test(message)) {
+    return fail("FORBIDDEN", "Only a manager at this business can add reports.");
+  }
+  if (/NOT_BOOKKEEPER/i.test(message) || error.code === "42501") {
+    return fail("FORBIDDEN", "You do not have permission to do that.");
+  }
+  if (/ALREADY_REMOVED/i.test(message)) {
+    return fail("CONFLICT", "That person is already off the payroll.");
+  }
+  if (/EMPLOYEE_NOT_FOUND/i.test(message) || error.code === "P0002") {
+    return fail("NOT_FOUND", "That person is no longer on this payroll.");
+  }
+  return fail("INTERNAL", "Could not update that person. Try again.");
 }

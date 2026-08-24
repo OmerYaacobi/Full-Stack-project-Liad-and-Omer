@@ -76,8 +76,8 @@ export function DocumentUploadForm({
               ))}
             </select>
             <p className="mt-1 text-xs text-slate-500">
-              Filed against this person. Tick the box below if managers should
-              be able to open it too.
+              Filed against this person. Managers can open it unless you uncheck
+              the box below.
             </p>
             <FieldError messages={fieldErrors?.employeeId} />
           </div>

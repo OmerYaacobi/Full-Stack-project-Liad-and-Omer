@@ -6,7 +6,7 @@ import { cancelTimeOffRequest, type TimeOffRequest } from "@/lib/actions/time-of
 import { TimeOffAttachmentLink } from "@/components/time-off/attachment-link";
 import { RequestStatusBadge } from "@/components/time-off/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
-import { formatDateRange, formatDays, formatIsoDate } from "@/lib/format";
+import { formatTimeOffWhen, formatDays, formatIsoDate } from "@/lib/format";
 
 export function TimeOffRequestList({
   requests,
@@ -28,7 +28,7 @@ export function TimeOffRequestList({
         <li key={request.id} className="flex items-start justify-between gap-3 px-4 py-3">
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-900">
-              {request.leaveTypeName} · {formatDateRange(request.startDate, request.endDate)}
+              {request.leaveTypeName} · {formatTimeOffWhen(request)}
             </p>
             <p className="mt-0.5 text-xs text-slate-500">
               {formatDays(request.workingDays)}

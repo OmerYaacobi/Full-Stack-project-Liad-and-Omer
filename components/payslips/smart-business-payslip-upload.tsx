@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { PayslipLeaveFields } from "@/components/payslips/payslip-leave-fields";
@@ -92,11 +92,10 @@ export function SmartBusinessPayslipUpload({
   companyId: string;
   employees: CompanyEmployee[];
 }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const period = defaultPeriod();
 
   const [drafts, setDrafts] = useState<PayslipDraft[]>([]);
-  const [shareWithManagers, setShareWithManagers] = useState(false);
+  const [shareWithManagers, setShareWithManagers] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState<{ done: number; total: number } | null>(
     null,
@@ -354,7 +353,6 @@ export function SmartBusinessPayslipUpload({
             Select payslip PDFs <span className="text-red-500">*</span>
           </label>
           <input
-            ref={fileInputRef}
             id="smart-payslip-file"
             name="files"
             type="file"

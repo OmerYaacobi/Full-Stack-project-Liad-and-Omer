@@ -187,6 +187,36 @@ export async function listMyPayslips(
   return listEmployeePayslips(companyId, employeeId);
 }
 
+export async function listPublishedPayslipsForEmployees(
+  companyId: string,
+  employeeIds: string[],
+): Promise<Map<string, StoredPayslip[]>> {
+  const grouped = new Map<string, StoredPayslip[]>();
+  if (employeeIds.length === 0) return grouped;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("payslips")
+    .select(
+      "id, employee_id, gross_pay, net_pay, total_deductions, status, file_size, created_at, visible_to_managers, payroll_periods(year, month)",
+    )
+    .eq("company_id", companyId)
+    .in("employee_id", employeeIds)
+    .eq("status", "published")
+    .order("created_at", { ascending: false });
+
+  if (error) return grouped;
+
+  for (const row of data ?? []) {
+    const stored = toStored(row);
+    if (!stored || !row.employee_id) continue;
+    const list = grouped.get(row.employee_id) ?? [];
+    list.push(stored);
+    grouped.set(row.employee_id, list);
+  }
+  return grouped;
+}
+
 export async function listPayslipsSharedWithManagers(
   companyId: string,
 ): Promise<StoredPayslip[]> {

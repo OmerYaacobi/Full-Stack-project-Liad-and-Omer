@@ -149,7 +149,7 @@ export function PayslipUploadForm({
           message: res.error,
         });
       }
-    } catch (err: any) {
+    } catch {
       setParseNotice({
         type: "error",
         message: "Failed to automatically read PDF values.",

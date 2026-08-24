@@ -2,16 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { DocumentFolders } from "@/components/documents/document-folders";
+import { NetPayTrend } from "@/components/insights/net-pay-trend";
+import { PayInsightCards } from "@/components/insights/pay-insight-cards";
 import { PayslipList } from "@/components/payslips/payslip-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
-import { StatCard } from "@/components/shared/stat-card";
 import { LeaveBalanceCards } from "@/components/time-off/balance-cards";
 import { listMyDocuments } from "@/lib/actions/documents";
 import { listMyPayslips } from "@/lib/actions/payslips";
 import { listMyLeaveBalances } from "@/lib/actions/time-off";
-import { formatDays, formatIls, formatPayslipPeriod } from "@/lib/format";
 import { requireMembership } from "@/lib/auth/context";
+import { buildPayInsights } from "@/lib/domain/insights";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -25,79 +26,46 @@ export default async function EmployeeDashboardPage() {
     listMyPayslips(ctx.membership.id, ctx.membership.company.id),
     listMyLeaveBalances(ctx.membership.id, ctx.membership.company.id),
   ]);
+  const insights = buildPayInsights(
+    payslips.filter((row) => row.status === "published"),
+  );
   const vacation = balances.find((row) => row.code === "vacation");
+  const sick = balances.find((row) => row.code === "sick");
   const recent = personal.slice(0, 5);
-  const latest = payslips[0];
-  const lastTwelve = payslips.slice(0, 12);
-  const averageNet =
-    lastTwelve.length >= 3
-      ? lastTwelve.reduce((sum, row) => sum + row.netPay, 0) / lastTwelve.length
-      : null;
-  const deductionRate =
-    latest && latest.grossPay > 0
-      ? Math.round((latest.totalDeductions / latest.grossPay) * 100)
-      : null;
 
   return (
     <>
       <PageHeader
         title={firstName ? `Hello, ${firstName}` : "Your dashboard"}
-        description="Your pay, your deductions, and your leave balance."
+        description="Last take-home, how it compares, and the leave you still have."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Latest net pay"
-          value={latest ? formatIls(latest.netPay) : "—"}
-          hint={
-            latest
-              ? formatPayslipPeriod(latest.year, latest.month)
-              : "No pay slips yet"
-          }
-        />
-        <StatCard
-          label="Average net (12mo)"
-          value={averageNet !== null ? formatIls(averageNet) : "—"}
-          hint={
-            averageNet !== null
-              ? `${lastTwelve.length} months`
-              : "Needs 3 months"
-          }
-        />
-        <StatCard
-          label="Deduction rate"
-          value={deductionRate !== null ? `${deductionRate}%` : "—"}
-          hint={latest ? "Of latest gross" : "No pay slips yet"}
-        />
-        <StatCard
-          label="Vacation available"
-          value={vacation ? formatDays(vacation.availableDays) : "—"}
-          hint={
-            vacation
-              ? `${formatDays(vacation.pendingDays)} pending`
-              : "No leave days set"
-          }
-        />
-      </div>
+      <PayInsightCards insights={insights} vacation={vacation} sick={sick} />
+
+      {insights.months.length >= 2 ? (
+        <div className="mt-8">
+          <NetPayTrend months={insights.months} />
+        </div>
+      ) : payslips.length === 0 ? (
+        <div className="mt-8">
+          <EmptyState
+            title="No pay history yet"
+            description="Your first pay slip will appear here once your bookkeeper publishes it. Leave balances below are already live."
+          />
+        </div>
+      ) : null}
 
       <div className="mt-8 space-y-4">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-sm font-medium text-slate-900">Documents</h2>
+          <h2 className="text-sm font-medium text-slate-900">Leave balance</h2>
           <Link
-            href="/employee/documents"
+            href="/employee/time-off"
             className="text-xs font-medium text-slate-500 hover:text-slate-900"
           >
-            See all
+            Request time off
           </Link>
         </div>
-        {recent.length === 0 ? (
-          <EmptyState
-            title="No documents yet"
-            description="When your bookkeeper files a form or contract for you, it appears here."
-          />
-        ) : (
-          <DocumentFolders documents={recent} />
-        )}
+        <LeaveBalanceCards balances={balances} />
       </div>
 
       <div className="mt-8 space-y-4">
@@ -119,15 +87,22 @@ export default async function EmployeeDashboardPage() {
 
       <div className="mt-8 space-y-4">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-sm font-medium text-slate-900">Leave balance</h2>
+          <h2 className="text-sm font-medium text-slate-900">Documents</h2>
           <Link
-            href="/employee/time-off"
+            href="/employee/documents"
             className="text-xs font-medium text-slate-500 hover:text-slate-900"
           >
-            Request time off
+            See all
           </Link>
         </div>
-        <LeaveBalanceCards balances={balances} />
+        {recent.length === 0 ? (
+          <EmptyState
+            title="No documents yet"
+            description="When your bookkeeper files a form or contract for you, it appears here."
+          />
+        ) : (
+          <DocumentFolders documents={recent} />
+        )}
       </div>
     </>
   );

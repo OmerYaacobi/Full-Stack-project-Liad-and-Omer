@@ -1,5 +1,5 @@
 export function ShareWithManagersField({
-  defaultChecked = false,
+  defaultChecked = true,
   checked,
   onChange,
   disabled,
@@ -26,8 +26,9 @@ export function ShareWithManagersField({
       <span>
         <span className="font-medium text-slate-900">Managers can open this</span>
         <span className="mt-0.5 block text-xs text-slate-500">
-          Every manager in this business, not only the person it is filed
-          against. Unchecked, only that person and you can open it.
+          On by default. Every manager in this business can open it, not only
+          the person it is filed against. Uncheck to keep it between that
+          person and you.
         </span>
       </span>
     </label>

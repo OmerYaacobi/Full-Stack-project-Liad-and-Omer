@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { getMyEmployeeId } from "@/lib/actions/employees";
+import { listPublishedPayslipsForEmployees } from "@/lib/actions/payslips";
 import { fail, fromZod, ok, type ActionResult } from "@/lib/actions/result";
+import { buildPayInsights } from "@/lib/domain/insights";
 import {
   calendarDateInZone,
   calendarSpanDays,
@@ -53,6 +55,7 @@ export type TimeOffRequest = {
   startDate: string;
   endDate: string;
   workingDays: number;
+  unscheduled: boolean;
   reason: string | null;
   status: "pending" | "approved" | "rejected" | "cancelled";
   createdAt: string;
@@ -97,7 +100,12 @@ export type DirectReportSummary = {
   jobTitle: string | null;
   department: string | null;
   vacationAvailable: number | null;
+  sickAvailable: number | null;
   pendingRequests: number;
+  latestNet: number | null;
+  latestYear: number | null;
+  latestMonth: number | null;
+  averageNet: number | null;
 };
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -242,8 +250,9 @@ export async function submitTimeOffRequest(
 ): Promise<ActionResult<void>> {
   const parsed = timeOffRequestSchema.safeParse({
     leaveTypeId: formData.get("leaveTypeId"),
-    startDate: formData.get("startDate"),
-    endDate: formData.get("endDate"),
+    useRemaining: formData.get("useRemaining") ?? "",
+    startDate: formData.get("startDate") ?? "",
+    endDate: formData.get("endDate") ?? "",
     reason: formData.get("reason") ?? "",
   });
   if (!parsed.success) return fromZod(parsed.error);
@@ -253,27 +262,6 @@ export async function submitTimeOffRequest(
   const { supabase, companyId, employeeId, timezone } = ctx.data;
 
   const today = calendarDateInZone(timezone);
-  if (parsed.data.startDate < today) {
-    return fail("VALIDATION", "Pick today or a future date.", {
-      startDate: ["Pick today or a future date."],
-    });
-  }
-
-  const workingDays = await workingDaysFor(
-    supabase,
-    companyId,
-    parsed.data.startDate,
-    parsed.data.endDate,
-  );
-  if (workingDays === null) {
-    return fail("INTERNAL", "Could not count working days. Try again.");
-  }
-  if (workingDays === 0) {
-    return fail("VALIDATION", "Those dates contain no working days.", {
-      endDate: ["Those dates contain no working days."],
-    });
-  }
-
   const balances = await listEmployeeLeaveBalances(companyId, employeeId);
   const balance = balances.find((row) => row.leaveTypeId === parsed.data.leaveTypeId);
   if (!balance) {
@@ -281,12 +269,58 @@ export async function submitTimeOffRequest(
       leaveTypeId: ["Pick a leave type that this business uses."],
     });
   }
-  if (balance.tracksBalance && balance.availableDays < workingDays) {
-    return fail(
-      "VALIDATION",
-      `You have ${balance.availableDays} days available but requested ${workingDays}.`,
-      { endDate: [`You have ${balance.availableDays} days available.`] },
+
+  let startDate = parsed.data.startDate ?? "";
+  let endDate = parsed.data.endDate ?? "";
+  let workingDays = 0;
+  let unscheduled = false;
+
+  if (parsed.data.useRemaining) {
+    if (!balance.tracksBalance) {
+      return fail(
+        "VALIDATION",
+        "This leave type does not keep a remaining balance. Pick dates instead.",
+        { leaveTypeId: ["This leave type does not keep a remaining balance."] },
+      );
+    }
+    if (balance.availableDays <= 0) {
+      return fail("VALIDATION", "You have no remaining days to request.", {
+        useRemaining: ["You have no remaining days to request."],
+      });
+    }
+    unscheduled = true;
+    startDate = today;
+    endDate = today;
+    workingDays = balance.availableDays;
+  } else {
+    if (startDate < today) {
+      return fail("VALIDATION", "Pick today or a future date.", {
+        startDate: ["Pick today or a future date."],
+      });
+    }
+
+    const counted = await workingDaysFor(
+      supabase,
+      companyId,
+      startDate,
+      endDate,
     );
+    if (counted === null) {
+      return fail("INTERNAL", "Could not count working days. Try again.");
+    }
+    if (counted === 0) {
+      return fail("VALIDATION", "Those dates contain no working days.", {
+        endDate: ["Those dates contain no working days."],
+      });
+    }
+    workingDays = counted;
+    if (balance.tracksBalance && balance.availableDays < workingDays) {
+      return fail(
+        "VALIDATION",
+        `You have ${balance.availableDays} days available but requested ${workingDays}.`,
+        { endDate: [`You have ${balance.availableDays} days available.`] },
+      );
+    }
   }
 
   const files = [...formData.getAll("attachments")].filter(
@@ -310,9 +344,10 @@ export async function submitTimeOffRequest(
       company_id: companyId,
       employee_id: employeeId,
       leave_type_id: parsed.data.leaveTypeId,
-      start_date: parsed.data.startDate,
-      end_date: parsed.data.endDate,
+      start_date: startDate,
+      end_date: endDate,
       working_days: workingDays,
+      unscheduled,
       reason: parsed.data.reason ?? null,
     })
     .select("id")
@@ -460,6 +495,8 @@ async function buildPendingApprovals(filter: {
           other.id !== request.id &&
           other.employeeId !== request.employeeId &&
           other.companyId === request.companyId &&
+          !request.unscheduled &&
+          !other.unscheduled &&
           rangesOverlap(
             request.startDate,
             request.endDate,
@@ -497,9 +534,15 @@ export async function listDirectReportSummaries(
     .select("id, full_name, job_title, department")
     .eq("company_id", companyId)
     .eq("manager_id", managerId)
+    .in("status", ["active", "on_leave"])
     .order("full_name", { ascending: true });
 
   if (error || !reports?.length) return [];
+
+  const slipsByEmployee = await listPublishedPayslipsForEmployees(
+    companyId,
+    reports.map((row) => row.id),
+  );
 
   const summaries = await Promise.all(
     reports.map(async (row) => {
@@ -508,13 +551,20 @@ export async function listDirectReportSummaries(
         listRequests({ employeeId: row.id }),
       ]);
       const vacation = balances.find((item) => item.code === "vacation");
+      const sick = balances.find((item) => item.code === "sick");
+      const insights = buildPayInsights(slipsByEmployee.get(row.id) ?? []);
       return {
         id: row.id,
         fullName: row.full_name,
         jobTitle: row.job_title,
         department: row.department,
         vacationAvailable: vacation?.availableDays ?? null,
+        sickAvailable: sick?.availableDays ?? null,
         pendingRequests: requests.filter((item) => item.status === "pending").length,
+        latestNet: insights.latest?.netPay ?? null,
+        latestYear: insights.latest?.year ?? null,
+        latestMonth: insights.latest?.month ?? null,
+        averageNet: insights.rollingAverage,
       };
     }),
   );
@@ -529,15 +579,40 @@ export async function managerOverviewStats(
   pending: number;
   reports: number;
   awayThisMonth: number;
+  vacationRemaining: number | null;
+  sickRemaining: number | null;
+  averageLatestNet: number | null;
 }> {
   const [pending, reports] = await Promise.all([
     listPendingApprovals(membershipId, companyId),
     listDirectReportSummaries(membershipId, companyId),
   ]);
 
+  const vacation = reports
+    .map((row) => row.vacationAvailable)
+    .filter((value): value is number => value !== null);
+  const sick = reports
+    .map((row) => row.sickAvailable)
+    .filter((value): value is number => value !== null);
+  const latestNets = reports
+    .map((row) => row.latestNet)
+    .filter((value): value is number => value !== null);
+
+  const empty = {
+    pending: pending.length,
+    reports: reports.length,
+    awayThisMonth: 0,
+    vacationRemaining: vacation.length ? vacation.reduce((sum, value) => sum + value, 0) : null,
+    sickRemaining: sick.length ? sick.reduce((sum, value) => sum + value, 0) : null,
+    averageLatestNet:
+      latestNets.length === 0
+        ? null
+        : latestNets.reduce((sum, value) => sum + value, 0) / latestNets.length,
+  };
+
   const managerId = await getMyEmployeeId(membershipId);
   if (!managerId) {
-    return { pending: pending.length, reports: reports.length, awayThisMonth: 0 };
+    return empty;
   }
 
   const now = new Date();
@@ -552,13 +627,16 @@ export async function managerOverviewStats(
       : await listRequests({ employeeIds: teamIds, status: "approved" });
   const awayThisMonth = new Set(
     teamRequests
-      .filter((row) => rangesOverlap(row.startDate, row.endDate, monthStart, monthEnd))
+      .filter(
+        (row) =>
+          !row.unscheduled &&
+          rangesOverlap(row.startDate, row.endDate, monthStart, monthEnd),
+      )
       .map((row) => row.employeeId),
   ).size;
 
   return {
-    pending: pending.length,
-    reports: reports.length,
+    ...empty,
     awayThisMonth,
   };
 }
@@ -653,7 +731,7 @@ async function listRequests(filter: {
   let query = supabase
     .from("time_off_requests")
     .select(
-      "id, company_id, leave_type_id, start_date, end_date, working_days, reason, status, created_at, decided_at, decision_note, employee_id, leave_types(name), employees(full_name), companies(name)",
+      "id, company_id, leave_type_id, start_date, end_date, working_days, unscheduled, reason, status, created_at, decided_at, decision_note, employee_id, leave_types(name), employees(full_name), companies(name)",
     )
     .order("created_at", { ascending: false });
 
@@ -685,6 +763,7 @@ async function listRequests(filter: {
       startDate: row.start_date,
       endDate: row.end_date,
       workingDays: Number(row.working_days),
+      unscheduled: Boolean(row.unscheduled),
       reason: row.reason,
       status: row.status as TimeOffRequest["status"],
       createdAt: row.created_at,
@@ -785,6 +864,12 @@ function mapTimeOffError(error: { code?: string; message?: string }): ActionResu
 
   if (code === "23P01" || /no_overlapping_active_leave|exclusion/i.test(message)) {
     return fail("CONFLICT", "You already have a request covering these dates.");
+  }
+  if (code === "23505" || /uniq_pending_unscheduled_leave/i.test(message)) {
+    return fail(
+      "CONFLICT",
+      "You already have a pending request for all remaining days of this leave type.",
+    );
   }
   if (/ALREADY_DECIDED/i.test(message)) {
     return fail("CONFLICT", "This request was already decided.");

@@ -10,5 +10,4 @@ export const publishPayrollPeriodSchema = z.object({
   periodId: z.string().uuid(),
 });
 
-export type OpenPayrollPeriodInput = z.infer<typeof openPayrollPeriodSchema>;
 export type PeriodStatus = "draft" | "published" | "locked";

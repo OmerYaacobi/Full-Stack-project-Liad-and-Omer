@@ -17,7 +17,6 @@ export type PeriodSummary = {
   year: number;
   month: number;
   status: PeriodStatus;
-  publishedAt: string | null;
   employeeCount: number;
   assignedCount: number;
   publishedCount: number;
@@ -30,7 +29,6 @@ export type PeriodEmployeeRow = {
   employeeNumber: string;
   payslipId: string | null;
   netPay: number | null;
-  grossPay: number | null;
   slipStatus: "assigned" | "published" | null;
 };
 
@@ -41,7 +39,6 @@ export type PeriodDetail = {
   year: number;
   month: number;
   status: PeriodStatus;
-  publishedAt: string | null;
   employeeCount: number;
   assignedCount: number;
   publishedCount: number;
@@ -173,7 +170,7 @@ export async function listPayrollPeriods(): Promise<PeriodSummary[]> {
   const supabase = await createClient();
   const { data: periods, error } = await supabase
     .from("payroll_periods")
-    .select("id, company_id, year, month, status, published_at, companies(name)")
+    .select("id, company_id, year, month, status, companies(name)")
     .order("year", { ascending: false })
     .order("month", { ascending: false });
 
@@ -220,21 +217,11 @@ export async function listPayrollPeriods(): Promise<PeriodSummary[]> {
       year: row.year,
       month: row.month,
       status: row.status as PeriodStatus,
-      publishedAt: row.published_at,
       employeeCount: employeeCountByCompany.get(row.company_id) ?? 0,
       assignedCount: stats.assigned,
       publishedCount: stats.published,
     };
   });
-}
-
-function periodNeedsPublish(period: PeriodSummary): boolean {
-  return period.status !== "locked" && period.assignedCount > period.publishedCount;
-}
-
-export async function countUnpublishedPeriods(): Promise<number> {
-  const periods = await listPayrollPeriods();
-  return periods.filter(periodNeedsPublish).length;
 }
 
 export async function getPayrollPeriod(
@@ -243,7 +230,7 @@ export async function getPayrollPeriod(
   const supabase = await createClient();
   const { data: period, error } = await supabase
     .from("payroll_periods")
-    .select("id, company_id, year, month, status, published_at, companies(name)")
+    .select("id, company_id, year, month, status, companies(name)")
     .eq("id", periodId)
     .maybeSingle();
 
@@ -258,7 +245,7 @@ export async function getPayrollPeriod(
       .order("full_name", { ascending: true }),
     supabase
       .from("payslips")
-      .select("id, employee_id, net_pay, gross_pay, status")
+      .select("id, employee_id, net_pay, status")
       .eq("period_id", period.id),
   ]);
 
@@ -277,7 +264,6 @@ export async function getPayrollPeriod(
       employeeNumber: employee.employee_number,
       payslipId: slip?.id ?? null,
       netPay: slip ? Number(slip.net_pay) : null,
-      grossPay: slip ? Number(slip.gross_pay) : null,
       slipStatus:
         slip?.status === "published" || slip?.status === "assigned"
           ? slip.status
@@ -298,7 +284,6 @@ export async function getPayrollPeriod(
     year: period.year,
     month: period.month,
     status: period.status as PeriodStatus,
-    publishedAt: period.published_at,
     employeeCount: roster.length,
     assignedCount,
     publishedCount,

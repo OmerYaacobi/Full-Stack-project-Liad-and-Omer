@@ -1,10 +1,14 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
+import { fail, fromZod, ok, type ActionResult } from "@/lib/actions/result";
 import { createClient } from "@/lib/supabase/server";
 import {
   createBusinessSchema,
   type CreateBusinessInput,
 } from "@/lib/validations/auth";
+import { z } from "zod";
 
 async function resolveUserFirm(supabase: any, user: any) {
   // 1. Try finding active firm membership
@@ -233,4 +237,63 @@ export async function listFirmBusinesses() {
   });
 
   return { ok: true, data: formatted };
+}
+
+export async function removeCompany(
+  companyId: string,
+): Promise<ActionResult<void>> {
+  const parsed = z.object({ companyId: z.string().uuid() }).safeParse({
+    companyId,
+  });
+  if (!parsed.success) return fromZod(parsed.error);
+
+  const supabase = await createClient();
+  const [{ data: slips }, { data: documents }, { data: attachments }] =
+    await Promise.all([
+      supabase.from("payslips").select("file_path").eq("company_id", parsed.data.companyId),
+      supabase.from("documents").select("file_path").eq("company_id", parsed.data.companyId),
+      supabase
+        .from("time_off_attachments")
+        .select("file_path")
+        .eq("company_id", parsed.data.companyId),
+    ]);
+
+  const { error } = await supabase.rpc("remove_company", {
+    p_company_id: parsed.data.companyId,
+  });
+  if (error) {
+    if (/NOT_BOOKKEEPER/i.test(error.message) || error.code === "42501") {
+      return fail("FORBIDDEN", "You do not have permission to remove this business.");
+    }
+    if (/COMPANY_NOT_FOUND/i.test(error.message) || error.code === "P0002") {
+      return fail("NOT_FOUND", "That business is no longer available.");
+    }
+    return fail("INTERNAL", "Could not remove that business. Try again.");
+  }
+
+  const payslipPaths = (slips ?? [])
+    .map((row) => row.file_path)
+    .filter((path): path is string => Boolean(path));
+  const documentPaths = (documents ?? [])
+    .map((row) => row.file_path)
+    .filter((path): path is string => Boolean(path));
+  const timeOffPaths = (attachments ?? [])
+    .map((row) => row.file_path)
+    .filter((path): path is string => Boolean(path));
+
+  if (payslipPaths.length) {
+    await supabase.storage.from("payslips").remove(payslipPaths);
+  }
+  if (documentPaths.length) {
+    await supabase.storage.from("documents").remove(documentPaths);
+  }
+  if (timeOffPaths.length) {
+    await supabase.storage.from("time_off").remove(timeOffPaths);
+  }
+
+  revalidatePath("/bookkeeper");
+  revalidatePath("/bookkeeper/businesses");
+  revalidatePath("/bookkeeper/periods");
+  revalidatePath("/dashboard");
+  return ok(undefined);
 }

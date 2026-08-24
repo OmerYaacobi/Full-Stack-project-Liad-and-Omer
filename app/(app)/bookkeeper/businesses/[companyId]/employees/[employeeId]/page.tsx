@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AssignManagerForm } from "@/components/employees/assign-manager-form";
+import { TerminateEmployeeButton } from "@/components/employees/terminate-employee-button";
 import { DocumentFolder } from "@/components/documents/document-folder";
 import { DocumentUploadForm } from "@/components/documents/document-upload-form";
 import { PayslipList } from "@/components/payslips/payslip-list";
@@ -65,6 +66,7 @@ export default async function EmployeeDocumentsPage({
       <PageHeader
         title={employee.fullName}
         description={[
+          employee.status === "terminated" ? "Removed from payroll" : null,
           employee.nationalId ? `ID: ${employee.nationalId}` : `#${employee.employeeNumber}`,
           employee.jobTitle,
           employee.department,
@@ -75,15 +77,26 @@ export default async function EmployeeDocumentsPage({
           .join(" · ")}
       />
 
-      <AssignManagerForm
-        companyId={companyId}
-        employee={employee}
-        managers={managers}
-      />
+      {employee.status === "terminated" ? (
+        <p className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          This person is off the payroll. They cannot sign in. Files below stay
+          for history.
+        </p>
+      ) : null}
 
-      <div className="mt-8">
-        <PayslipUploadForm companyId={companyId} employee={employee} />
-      </div>
+      {employee.status !== "terminated" ? (
+        <AssignManagerForm
+          companyId={companyId}
+          employee={employee}
+          managers={managers}
+        />
+      ) : null}
+
+      {employee.status !== "terminated" ? (
+        <div className="mt-8">
+          <PayslipUploadForm companyId={companyId} employee={employee} />
+        </div>
+      ) : null}
 
       <div className="mt-8 space-y-4">
         <h2 className="text-sm font-medium text-slate-900">Pay slips</h2>
@@ -95,7 +108,9 @@ export default async function EmployeeDocumentsPage({
         />
       </div>
 
-      <DocumentUploadForm companyId={companyId} lockedTo={employee} />
+      {employee.status !== "terminated" ? (
+        <DocumentUploadForm companyId={companyId} lockedTo={employee} />
+      ) : null}
 
       <div className="mt-8 space-y-4">
         <h2 className="text-sm font-medium text-slate-900">Folders</h2>
@@ -113,6 +128,24 @@ export default async function EmployeeDocumentsPage({
           />
         ))}
       </div>
+
+      {employee.status !== "terminated" ? (
+        <section className="mt-12 border-t border-slate-200 pt-8">
+          <h2 className="text-sm font-medium text-slate-900">
+            Remove from payroll
+          </h2>
+          <p className="mt-1 mb-3 max-w-xl text-xs text-slate-500">
+            They lose access immediately. Pay slips and files stay on this
+            business for history.
+          </p>
+          <TerminateEmployeeButton
+            employeeId={employee.id}
+            fullName={employee.fullName}
+            role={employee.role}
+            redirectTo={`/bookkeeper/businesses/${companyId}`}
+          />
+        </section>
+      ) : null}
     </>
   );
 }

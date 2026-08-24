@@ -23,10 +23,6 @@ export const DOCUMENT_KIND_VALUES = DOCUMENT_KINDS.map((k) => k.value) as [
   ...DocumentKind[],
 ];
 
-export function documentKindLabel(kind: string): string {
-  return DOCUMENT_KINDS.find((k) => k.value === kind)?.label ?? "Other";
-}
-
 // Matches the bucket's own file_size_limit and allowed_mime_types, so an
 // oversized or wrong-typed file is rejected before it leaves the server rather
 // than by a storage error the user cannot read.
