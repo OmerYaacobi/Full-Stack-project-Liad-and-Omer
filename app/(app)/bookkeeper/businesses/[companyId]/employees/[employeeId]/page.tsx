@@ -90,7 +90,7 @@ export default async function EmployeeDocumentsPage({
         <PayslipList
           payslips={payslips}
           emptyTitle="No pay slips yet"
-          emptyDescription="Upload a PDF for a payroll month. It is published straight away so they can open it."
+          emptyDescription="Upload a PDF for a payroll month. It stays in draft until you publish that month from Payroll periods."
           canShare
         />
       </div>

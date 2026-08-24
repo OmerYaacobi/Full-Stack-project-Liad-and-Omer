@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { uploadPayslip } from "@/lib/actions/payslips";
 import type { CompanyEmployee } from "@/lib/actions/employees";
@@ -172,8 +172,8 @@ export function PayslipUploadForm({
         Upload a pay slip for {employee.fullName}
       </h2>
       <p className="mt-0.5 text-xs text-slate-500">
-        PDF only, up to 10 MB. Publishing happens on upload so they can open it
-        immediately.
+        PDF only, up to 10 MB. Saved to the payroll month as a draft. Publish
+        from Payroll periods when the roster looks right.
       </p>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -335,7 +335,15 @@ export function PayslipUploadForm({
       )}
       {state?.ok && (
         <p role="status" className="mt-3 text-sm text-emerald-700">
-          Published. They can open it under Pay slips.
+          {state.data.published
+            ? "Saved and published. They can open it under Pay slips."
+            : "Saved to the payroll month. Publish it from Payroll periods when you are ready."}{" "}
+          <a
+            href={`/bookkeeper/periods/${state.data.periodId}`}
+            className="font-medium underline underline-offset-2"
+          >
+            Open payroll month
+          </a>
         </p>
       )}
 
@@ -344,7 +352,7 @@ export function PayslipUploadForm({
         disabled={pending || isParsing}
         className="mt-4 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60 cursor-pointer"
       >
-        {pending ? "Publishing…" : "Upload and publish"}
+        {pending ? "Saving…" : "Save to payroll month"}
       </button>
     </form>
   );

@@ -54,6 +54,16 @@ export default async function BusinessPage({
         description={`Tax ID ${company.tax_id}`}
       />
 
+      <p className="mb-6 -mt-4 text-sm text-slate-600">
+        <Link
+          href={`/bookkeeper/periods?companyId=${company.id}`}
+          className="font-medium text-slate-900 underline underline-offset-2"
+        >
+          Payroll periods
+        </Link>{" "}
+        for this business — upload slips here, then publish the month so employees can open them.
+      </p>
+
       <InvitePeoplePanel
         companyId={company.id}
         companyName={company.name}

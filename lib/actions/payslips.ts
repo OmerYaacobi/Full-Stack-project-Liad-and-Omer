@@ -5,6 +5,7 @@ import { createHash } from "crypto";
 import { revalidatePath } from "next/cache";
 
 import { applyPayslipLeaveBalances, getMyEmployeeId } from "@/lib/actions/employees";
+import { ensurePayrollPeriod } from "@/lib/actions/periods";
 import { fail, fromZod, ok, type ActionResult } from "@/lib/actions/result";
 import { createClient } from "@/lib/supabase/server";
 import { MAX_PAYSLIP_BYTES, uploadPayslipSchema } from "@/lib/validations/payslips";
@@ -26,9 +27,9 @@ export type StoredPayslip = {
 };
 
 export async function uploadPayslip(
-  _previous: ActionResult<void> | null,
+  _previous: ActionResult<{ published: boolean; periodId: string }> | null,
   formData: FormData,
-): Promise<ActionResult<void>> {
+): Promise<ActionResult<{ published: boolean; periodId: string }>> {
   const parsed = uploadPayslipSchema.safeParse({
     companyId: formData.get("companyId"),
     employeeId: formData.get("employeeId"),
@@ -72,9 +73,9 @@ export async function uploadPayslip(
     sickDays,
   } = parsed.data;
 
-  const periodId = await ensurePeriod(supabase, companyId, year, month);
-  if (!periodId) {
-    return fail("INTERNAL", "Could not open that payroll month. Try again.");
+  const period = await ensurePayrollPeriod(supabase, companyId, year, month);
+  if ("error" in period) {
+    return fail("INTERNAL", period.error);
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -92,13 +93,14 @@ export async function uploadPayslip(
   const { data: existing } = await supabase
     .from("payslips")
     .select("id, file_path")
-    .eq("period_id", periodId)
+    .eq("period_id", period.id)
     .eq("employee_id", employeeId)
     .maybeSingle();
 
+  const alreadyLive = period.status === "published";
   const row = {
     company_id: companyId,
-    period_id: periodId,
+    period_id: period.id,
     employee_id: employeeId,
     gross_pay: grossPay,
     net_pay: netPay,
@@ -124,22 +126,25 @@ export async function uploadPayslip(
     await supabase.storage.from(BUCKET).remove([existing.file_path]);
   }
 
-  // Employees may only read status = published. The RPC flips the period and
-  // every assigned slip in it, which is the contract the empty states describe.
-  const { error: publishError } = await supabase.rpc("publish_payroll_period", {
-    p_period_id: periodId,
-  });
-  if (publishError) {
-    return fail(
-      "INTERNAL",
-      "The pay slip was saved but not published. Open it from this page and try again.",
-    );
+  if (alreadyLive) {
+    const { error: publishError } = await supabase.rpc("publish_payroll_period", {
+      p_period_id: period.id,
+    });
+    if (publishError) {
+      return fail(
+        "INTERNAL",
+        "The pay slip was saved but not published. Open Payroll periods and publish the month.",
+      );
+    }
   }
 
   revalidateEmployeePayslips(companyId, employeeId);
   revalidatePath("/manager/shared");
   revalidatePath("/employee/time-off");
   revalidatePath("/employee");
+  revalidatePath("/bookkeeper");
+  revalidatePath("/bookkeeper/periods");
+  revalidatePath(`/bookkeeper/periods/${period.id}`);
 
   await applyPayslipLeaveBalances({
     companyId,
@@ -151,7 +156,7 @@ export async function uploadPayslip(
     actorId: user.id,
   });
 
-  return ok(undefined);
+  return ok({ published: alreadyLive, periodId: period.id });
 }
 
 export async function listEmployeePayslips(
@@ -250,44 +255,6 @@ export async function getPayslipOpenUrl(
   }
 
   return ok(data.signedUrl);
-}
-
-type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
-
-async function ensurePeriod(
-  supabase: SupabaseClient,
-  companyId: string,
-  year: number,
-  month: number,
-): Promise<string | null> {
-  const { data: existing } = await supabase
-    .from("payroll_periods")
-    .select("id")
-    .eq("company_id", companyId)
-    .eq("year", year)
-    .eq("month", month)
-    .maybeSingle();
-
-  if (existing?.id) return existing.id;
-
-  const { data: created, error } = await supabase
-    .from("payroll_periods")
-    .insert({ company_id: companyId, year, month, status: "draft" })
-    .select("id")
-    .single();
-
-  if (created?.id) return created.id;
-  if (error?.code !== "23505") return null;
-
-  const { data: raced } = await supabase
-    .from("payroll_periods")
-    .select("id")
-    .eq("company_id", companyId)
-    .eq("year", year)
-    .eq("month", month)
-    .maybeSingle();
-
-  return raced?.id ?? null;
 }
 
 function toStored(row: {

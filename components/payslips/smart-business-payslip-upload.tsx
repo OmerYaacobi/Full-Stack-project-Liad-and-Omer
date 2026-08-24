@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
 
 import { PayslipLeaveFields } from "@/components/payslips/payslip-leave-fields";
 import { ShareWithManagersField } from "@/components/shared/share-with-managers-field";
@@ -96,11 +97,12 @@ export function SmartBusinessPayslipUpload({
 
   const [drafts, setDrafts] = useState<PayslipDraft[]>([]);
   const [shareWithManagers, setShareWithManagers] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishProgress, setPublishProgress] = useState<{ done: number; total: number } | null>(
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState<{ done: number; total: number } | null>(
     null,
   );
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successHref, setSuccessHref] = useState<string | null>(null);
   const [batchError, setBatchError] = useState<string | null>(null);
 
   const parsingCount = drafts.filter((draft) => draft.status === "parsing").length;
@@ -228,26 +230,28 @@ export function SmartBusinessPayslipUpload({
     setDrafts((current) => current.filter((draft) => draft.id !== id));
   }
 
-  async function publishReady() {
-    const toPublish = drafts.filter(
+  async function saveReady() {
+    const toSave = drafts.filter(
       (draft) => draft.status !== "parsing" && draft.employeeId,
     );
-    if (toPublish.length === 0) return;
+    if (toSave.length === 0) return;
 
-    setIsPublishing(true);
-    setPublishProgress({ done: 0, total: toPublish.length });
+    setIsSaving(true);
+    setSaveProgress({ done: 0, total: toSave.length });
     setBatchError(null);
     setSuccessMessage(null);
+    setSuccessHref(null);
 
     const succeeded = new Set<string>();
+    const periodIds = new Set<string>();
+    let publishedCount = 0;
     let failCount = 0;
 
-    for (let index = 0; index < toPublish.length; index += 1) {
-      const draft = toPublish[index];
+    for (let index = 0; index < toSave.length; index += 1) {
+      const draft = toSave[index];
       const formData = new FormData();
       formData.set("companyId", companyId);
       formData.set("employeeId", draft.employeeId);
-      formData.set("file", draft.file);
       formData.set("year", String(draft.year));
       formData.set("month", String(draft.month));
       formData.set("grossPay", draft.grossPay);
@@ -255,30 +259,44 @@ export function SmartBusinessPayslipUpload({
       formData.set("totalDeductions", draft.totalDeductions);
       formData.set("vacationDays", draft.vacationDays);
       formData.set("sickDays", draft.sickDays);
+      formData.set("file", draft.file);
       if (shareWithManagers) formData.set("shareWithManagers", "on");
 
       const result = await uploadPayslip(null, formData);
       if (result.ok) {
         succeeded.add(draft.id);
+        periodIds.add(result.data.periodId);
+        if (result.data.published) publishedCount += 1;
       } else {
         failCount += 1;
         patchDraft(draft.id, { publishError: result.error });
       }
-      setPublishProgress({ done: index + 1, total: toPublish.length });
+      setSaveProgress({ done: index + 1, total: toSave.length });
     }
 
     setDrafts((current) => current.filter((draft) => !succeeded.has(draft.id)));
-    setIsPublishing(false);
-    setPublishProgress(null);
+    setIsSaving(false);
+    setSaveProgress(null);
 
     if (succeeded.size > 0) {
-      setSuccessMessage(
-        failCount > 0
-          ? `Published ${succeeded.size} payslip${succeeded.size === 1 ? "" : "s"}. ${failCount} still need attention.`
-          : `Published ${succeeded.size} payslip${succeeded.size === 1 ? "" : "s"} to the matching employees.`,
+      const draftCount = succeeded.size - publishedCount;
+      let message = `Saved ${succeeded.size} payslip${succeeded.size === 1 ? "" : "s"} as a draft. Publish the month from Payroll periods when the roster looks right.`;
+      if (publishedCount > 0 && draftCount > 0) {
+        message = `Saved ${succeeded.size} payslip${succeeded.size === 1 ? "" : "s"}. ${publishedCount} went live because those months were already published.`;
+      } else if (publishedCount === succeeded.size) {
+        message = `Saved and published ${succeeded.size} payslip${succeeded.size === 1 ? "" : "s"} — those months were already live.`;
+      }
+      if (failCount > 0) {
+        message += ` ${failCount} still need attention.`;
+      }
+      setSuccessMessage(message);
+      setSuccessHref(
+        periodIds.size === 1
+          ? `/bookkeeper/periods/${[...periodIds][0]}`
+          : "/bookkeeper/periods",
       );
     } else {
-      setBatchError("None of the payslips could be published. Check the errors on each file.");
+      setBatchError("None of the payslips could be saved. Check the errors on each file.");
     }
   }
 
@@ -293,17 +311,30 @@ export function SmartBusinessPayslipUpload({
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Select one or many digital payslip PDFs. Each file is matched to the right person by ת.ז / employee number and to the right payroll month, then you can publish them together.
+            Select one or many digital payslip PDFs. Each file is matched to the right person by ת.ז / employee number and to the right payroll month, then saved as a draft. Publish the month from Payroll periods when the roster looks right.
           </p>
         </div>
       </div>
 
       {successMessage && (
         <div className="mb-4 p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between gap-3">
-          <span>✓ {successMessage}</span>
+          <span>
+            ✓ {successMessage}
+            {successHref ? (
+              <>
+                {" "}
+                <Link href={successHref} className="font-semibold underline underline-offset-2">
+                  Open payroll month
+                </Link>
+              </>
+            ) : null}
+          </span>
           <button
             type="button"
-            onClick={() => setSuccessMessage(null)}
+            onClick={() => {
+              setSuccessMessage(null);
+              setSuccessHref(null);
+            }}
             className="text-emerald-700 hover:text-emerald-900 text-xs font-semibold"
           >
             Dismiss
@@ -329,7 +360,7 @@ export function SmartBusinessPayslipUpload({
             type="file"
             accept=".pdf,application/pdf"
             multiple
-            disabled={parsingCount > 0 || isPublishing}
+            disabled={parsingCount > 0 || isSaving}
             onChange={handleFileSelection}
             className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-700 disabled:opacity-60 cursor-pointer border border-slate-300 rounded-xl p-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
@@ -343,7 +374,7 @@ export function SmartBusinessPayslipUpload({
           )}
           {drafts.length > 0 && parsingCount === 0 && (
             <p className="mt-1 text-xs text-slate-500 font-medium">
-              {drafts.length} file{drafts.length === 1 ? "" : "s"} ready to review. You can add more PDFs before publishing.
+              {drafts.length} file{drafts.length === 1 ? "" : "s"} ready to review. You can add more PDFs before saving.
             </p>
           )}
         </div>
@@ -366,7 +397,7 @@ export function SmartBusinessPayslipUpload({
                   employee={employee}
                   employees={employees}
                   isDuplicate={isDuplicate}
-                  disabled={isPublishing}
+                  disabled={isSaving}
                   onChange={(patch) => patchDraft(draft.id, patch)}
                   onRemove={() => removeDraft(draft.id)}
                 />
@@ -380,28 +411,28 @@ export function SmartBusinessPayslipUpload({
             <ShareWithManagersField
               checked={shareWithManagers}
               onChange={setShareWithManagers}
-              disabled={isPublishing}
+              disabled={isSaving}
             />
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="button"
-                onClick={() => void publishReady()}
+                onClick={() => void saveReady()}
                 disabled={
-                  isPublishing || parsingCount > 0 || readyDrafts.length === 0
+                  isSaving || parsingCount > 0 || readyDrafts.length === 0
                 }
                 className="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
               >
-                {isPublishing && publishProgress ? (
+                {isSaving && saveProgress ? (
                   <>
                     <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
                     <span>
-                      Publishing {publishProgress.done} of {publishProgress.total}...
+                      Saving {saveProgress.done} of {saveProgress.total}...
                     </span>
                   </>
                 ) : (
                   <span>
-                    Publish {readyDrafts.length} payslip
-                    {readyDrafts.length === 1 ? "" : "s"}
+                    Save {readyDrafts.length} payslip
+                    {readyDrafts.length === 1 ? "" : "s"} to payroll
                   </span>
                 )}
               </button>
@@ -411,7 +442,7 @@ export function SmartBusinessPayslipUpload({
                   setDrafts([]);
                   setBatchError(null);
                 }}
-                disabled={isPublishing || parsingCount > 0}
+                disabled={isSaving || parsingCount > 0}
                 className="sm:w-auto py-2.5 px-4 rounded-xl border border-slate-300 bg-white text-slate-700 font-semibold text-sm hover:bg-slate-50 disabled:opacity-50"
               >
                 Clear list
@@ -483,7 +514,7 @@ function DraftCard({
 
       {isDuplicate && (
         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
-          Another file in this batch is for the same person and month. Publishing will replace the earlier slip.
+          Another file in this batch is for the same person and month. Saving will replace the earlier slip.
         </p>
       )}
 

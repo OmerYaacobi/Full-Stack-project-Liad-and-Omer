@@ -56,6 +56,13 @@ export function PayslipList({
                       {payslip.totalDeductions > 0
                         ? ` · Deductions ${formatIls(payslip.totalDeductions)}`
                         : ""}
+                      {canShare
+                        ? payslip.status === "published"
+                          ? " · Visible"
+                          : payslip.status === "assigned"
+                            ? " · Ready to publish"
+                            : ""
+                        : ""}
                       {payslip.visibleToManagers && !canShare
                         ? " · Shared with managers"
                         : ""}
