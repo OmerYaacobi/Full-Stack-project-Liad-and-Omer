@@ -7,17 +7,21 @@ import { DocumentFolder } from "./document-folder";
 export function DocumentFolders({
   documents,
   canShare = false,
+  collapsible = false,
+  showEmpty = false,
 }: {
   documents: StoredDocument[];
   canShare?: boolean;
+  collapsible?: boolean;
+  showEmpty?: boolean;
 }) {
   return (
-    <>
+    <div className="space-y-3">
       {DOCUMENT_KINDS.map((kind) => ({
         ...kind,
         documents: documents.filter((doc) => doc.kind === kind.value),
       }))
-        .filter((folder) => folder.documents.length > 0)
+        .filter((folder) => showEmpty || folder.documents.length > 0)
         .map((folder) => (
           <DocumentFolder
             key={folder.value}
@@ -25,8 +29,9 @@ export function DocumentFolders({
             hint={folder.hint}
             documents={folder.documents}
             canShare={canShare}
+            collapsible={collapsible}
           />
         ))}
-    </>
+    </div>
   );
 }

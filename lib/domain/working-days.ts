@@ -120,3 +120,37 @@ export function entitledDaysForYear(
 export function roundDays(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+export function formatMonthKey(year: number, month: number): string {
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}`;
+}
+
+export function parseMonthKey(
+  value: string | undefined,
+  fallback: { year: number; month: number },
+): { year: number; month: number } {
+  if (!value || !/^\d{4}-\d{2}$/.test(value)) return fallback;
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(5, 7));
+  if (month < 1 || month > 12 || year < 2000 || year > 2100) return fallback;
+  return { year, month };
+}
+
+export function shiftMonth(
+  year: number,
+  month: number,
+  delta: number,
+): { year: number; month: number } {
+  const date = new Date(Date.UTC(year, month - 1 + delta, 1));
+  return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 };
+}
+
+export function monthDateBounds(
+  year: number,
+  month: number,
+): { start: string; end: string } {
+  const start = `${formatMonthKey(year, month)}-01`;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const end = `${formatMonthKey(year, month)}-${String(lastDay).padStart(2, "0")}`;
+  return { start, end };
+}

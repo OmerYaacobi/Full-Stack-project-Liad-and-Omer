@@ -35,7 +35,7 @@ const MANAGER: NavGroup = {
     { href: "/manager/approvals", label: "Approvals" },
     { href: "/manager/team", label: "Team" },
     { href: "/manager/shared", label: "Shared files" },
-    { href: "/manager/calendar", label: "Calendar", soon: true },
+    { href: "/manager/calendar", label: "Calendar" },
   ],
 };
 
@@ -46,8 +46,7 @@ const BOOKKEEPER: NavGroup = {
     { href: "/bookkeeper/approvals", label: "Approvals" },
     { href: "/bookkeeper/businesses", label: "Businesses" },
     { href: "/bookkeeper/periods", label: "Payroll periods" },
-    { href: "/bookkeeper/employees", label: "Employees", soon: true },
-    { href: "/bookkeeper/documents", label: "Documents", soon: true },
+    { href: "/bookkeeper/documents", label: "Documents" },
   ],
 };
 

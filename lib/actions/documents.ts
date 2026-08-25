@@ -24,6 +24,9 @@ export type StoredDocument = {
   fileSize: number;
   createdAt: string;
   employeeName?: string | null;
+  employeeId?: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
   visibleToManagers: boolean;
 };
 
@@ -92,6 +95,7 @@ export async function uploadDocument(
   }
 
   revalidatePath(`/bookkeeper/businesses/${companyId}`);
+  revalidatePath("/bookkeeper/documents");
   revalidatePath("/employee");
   revalidatePath("/employee/documents");
   revalidatePath("/manager/shared");
@@ -186,6 +190,7 @@ function revalidateForm101(companyId: string, employeeId: string) {
   revalidatePath("/employee/documents");
   revalidatePath("/employee/documents/form-101");
   revalidatePath("/manager/shared");
+  revalidatePath("/bookkeeper/documents");
   revalidatePath(`/bookkeeper/businesses/${companyId}`);
   revalidatePath(`/bookkeeper/businesses/${companyId}/employees/${employeeId}`);
 }
@@ -229,10 +234,28 @@ export async function listDocumentsSharedWithManagers(
   const { data, error } = await supabase
     .from("documents")
     .select(
-      "id, kind, title, tax_year, file_size, created_at, visible_to_managers, employees(full_name)",
+      "id, kind, title, tax_year, file_size, created_at, visible_to_managers, employee_id, company_id, employees(full_name)",
     )
     .eq("company_id", companyId)
     .eq("visible_to_managers", true)
+    .order("created_at", { ascending: false });
+
+  if (error) return [];
+  return (data ?? []).map(mapDocument);
+}
+
+/**
+ * Every HR file the signed-in bookkeeper can see across the firms they manage.
+ * Pay slips are not included — those live on payroll periods.
+ */
+export async function listFirmDocuments(): Promise<StoredDocument[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("documents")
+    .select(
+      "id, kind, title, tax_year, file_size, created_at, visible_to_managers, employee_id, company_id, employees(full_name), companies(name)",
+    )
     .order("created_at", { ascending: false });
 
   if (error) return [];
@@ -256,6 +279,7 @@ export async function setDocumentManagerShare(
   }
 
   revalidatePath("/manager/shared");
+  revalidatePath("/bookkeeper/documents");
   revalidatePath(`/bookkeeper/businesses/${data.company_id}`);
   if (data.employee_id) {
     revalidatePath(
@@ -273,9 +297,13 @@ function mapDocument(row: {
   file_size: number;
   created_at: string;
   visible_to_managers?: boolean;
+  employee_id?: string | null;
+  company_id?: string | null;
   employees?: { full_name: string } | { full_name: string }[] | null;
+  companies?: { name: string } | { name: string }[] | null;
 }): StoredDocument {
   const employee = Array.isArray(row.employees) ? row.employees[0] : row.employees;
+  const company = Array.isArray(row.companies) ? row.companies[0] : row.companies;
   return {
     id: row.id,
     kind: row.kind,
@@ -285,6 +313,9 @@ function mapDocument(row: {
     createdAt: row.created_at,
     visibleToManagers: Boolean(row.visible_to_managers),
     employeeName: employee?.full_name ?? null,
+    employeeId: row.employee_id ?? null,
+    companyId: row.company_id ?? null,
+    companyName: company?.name ?? null,
   };
 }
 

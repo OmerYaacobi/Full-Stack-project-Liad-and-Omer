@@ -10,6 +10,8 @@ import {
   calendarDateInZone,
   calendarSpanDays,
   countWorkingDays,
+  monthDateBounds,
+  parseMonthKey,
   rangesOverlap,
   roundDays,
 } from "@/lib/domain/working-days";
@@ -106,6 +108,24 @@ export type DirectReportSummary = {
   latestYear: number | null;
   latestMonth: number | null;
   averageNet: number | null;
+};
+
+export type CalendarAbsence = {
+  id: string;
+  employeeName: string;
+  leaveTypeName: string;
+  startDate: string;
+  endDate: string;
+  reason: string | null;
+  status: "pending" | "approved";
+};
+
+export type ManagerCalendar = {
+  year: number;
+  month: number;
+  today: string;
+  weekendDays: number[];
+  absences: CalendarAbsence[];
 };
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -641,6 +661,65 @@ export async function managerOverviewStats(
   };
 }
 
+export async function listManagerCalendar(
+  companyId: string,
+  monthParam?: string,
+): Promise<ManagerCalendar> {
+  const supabase = await createClient();
+  const { data: company } = await supabase
+    .from("companies")
+    .select("timezone, weekend_days")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  const timezone = company?.timezone || "Asia/Jerusalem";
+  const weekendDays = Array.isArray(company?.weekend_days)
+    ? company.weekend_days.map(Number)
+    : [5, 6];
+  const today = calendarDateInZone(timezone);
+  const { year, month } = parseMonthKey(monthParam, {
+    year: Number(today.slice(0, 4)),
+    month: Number(today.slice(5, 7)),
+  });
+  const { start, end } = monthDateBounds(year, month);
+
+  const { data, error } = await supabase
+    .from("time_off_requests")
+    .select(
+      "id, start_date, end_date, reason, status, unscheduled, leave_types(name), employees(full_name)",
+    )
+    .eq("company_id", companyId)
+    .in("status", ["pending", "approved"])
+    .eq("unscheduled", false)
+    .lte("start_date", end)
+    .gte("end_date", start)
+    .order("start_date", { ascending: true });
+
+  if (error) {
+    return { year, month, today, weekendDays, absences: [] };
+  }
+
+  const absences: CalendarAbsence[] = (data ?? []).map((row) => {
+    const leaveType = Array.isArray(row.leave_types)
+      ? row.leave_types[0]
+      : row.leave_types;
+    const employee = Array.isArray(row.employees)
+      ? row.employees[0]
+      : row.employees;
+    return {
+      id: row.id,
+      employeeName: employee?.full_name ?? "Someone on the team",
+      leaveTypeName: leaveType?.name ?? "Leave",
+      startDate: row.start_date,
+      endDate: row.end_date,
+      reason: row.reason,
+      status: row.status as CalendarAbsence["status"],
+    };
+  });
+
+  return { year, month, today, weekendDays, absences };
+}
+
 async function requireEmployeeContext(): Promise<
   ActionResult<{
     supabase: SupabaseClient;
@@ -850,6 +929,7 @@ function revalidateTimeOff(companyId?: string) {
   revalidatePath("/employee/time-off");
   revalidatePath("/manager");
   revalidatePath("/manager/approvals");
+  revalidatePath("/manager/calendar");
   revalidatePath("/manager/team");
   revalidatePath("/bookkeeper");
   revalidatePath("/bookkeeper/approvals");
