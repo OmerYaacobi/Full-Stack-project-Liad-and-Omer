@@ -4,277 +4,138 @@
 
 | Mechanism | Used for | Why |
 | --- | --- | --- |
-| **Server Component data fetching** | every read that renders a page | No endpoint to write, no client-side fetch, payroll data never enters a JS bundle |
-| **Server Action** | every mutation triggered by a form | Progressive enhancement, automatic CSRF protection, `revalidatePath` in the same round trip |
-| **Route Handler** | file downloads, webhooks, cron, health | Needs real HTTP semantics: redirects, streaming, `Cache-Control`, external callers |
-| **Postgres RPC** | state transitions with invariants | Needs row locks and multi-statement atomicity (see `02-rls.md`) |
+| **Server Component data fetching** | every read that renders a page | No client-side fetch; payroll data stays out of the JS bundle |
+| **Server Action** | mutations and some reads triggered from the UI | CSRF via the Next.js action POST, `revalidatePath` in the same trip |
+| **Route Handler** | file open (HTTP redirect), PDF parse, auth callback | Needs real HTTP: `307`, streaming, query bodies |
+| **Postgres RPC** | state machines | Row locks and multi-statement atomicity (see `02-rls.md`) |
 
-We deliberately do **not** build a REST CRUD API over the tables. Supabase already
-exposes PostgREST guarded by RLS; adding hand-written `/api/employees` routes would
-mean a third place to enforce authorization and the most likely place to forget.
+We do **not** expose a public REST CRUD API. The browser talks to Server
+Actions; PostgREST is used only through the user-scoped Supabase client,
+which is already guarded by RLS.
 
 ## 2. The action contract
 
-Server Actions never throw across the boundary. Throwing produces a generic
-"An error occurred in the Server Components render" in production, which is
-useless to the user and to us. Instead every action returns a discriminated union:
+Actions do not throw across the boundary. They return:
 
 ```ts
 // lib/actions/result.ts
 export type ActionResult<T = void> =
   | { ok: true; data: T }
   | { ok: false; error: string; code: ErrorCode; fieldErrors?: Record<string, string[]> };
-
-export type ErrorCode =
-  | "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND"
-  | "VALIDATION" | "CONFLICT" | "RATE_LIMITED" | "INTERNAL";
 ```
 
-Every action is composed from the same middleware so authentication, validation,
-role checking, and error mapping cannot be skipped by accident:
+There is no shared `wrap.ts` middleware. Each `"use server"` file calls
+`safeParse`, `createClient()`, and `fail()` / `fromZod()` itself. Postgres
+errors are mapped in the same files (`42501` → forbidden, `23P01` /
+`23505` → conflict, RPC `P0001`/`P0002` → already decided / not found).
 
-```ts
-// lib/actions/wrap.ts
-export function action<TIn extends ZodTypeAny, TOut>(config: {
-  schema: TIn;
-  roles?: AppRole[];
-  handler: (input: z.infer<TIn>, ctx: ActionContext) => Promise<TOut>;
-}) {
-  return async (raw: unknown): Promise<ActionResult<TOut>> => {
-    try {
-      const ctx = await requireContext();               // session + membership or throw
-      if (config.roles && !config.roles.includes(ctx.role)) {
-        return fail("FORBIDDEN", "You do not have access to this action.");
-      }
-      const parsed = config.schema.safeParse(raw);
-      if (!parsed.success) return fromZod(parsed.error); // -> VALIDATION + fieldErrors
-      return { ok: true, data: await config.handler(parsed.data, ctx) };
-    } catch (e) {
-      return mapError(e);                                // PG codes -> ErrorCode
-    }
-  };
-}
-```
+## 3. Actions by domain
 
-`mapError` translates Postgres reality into product language:
+All live under `lib/actions/`.
 
-| Postgres | `ErrorCode` | Message shown |
-| --- | --- | --- |
-| `42501` insufficient privilege (RLS) | `FORBIDDEN` | "You do not have permission to do that." |
-| `23505` unique violation | `CONFLICT` | Context-specific, e.g. "This employee already has a pay slip for March 2026." |
-| `23P01` exclusion violation | `CONFLICT` | "You already have a request covering these dates." |
-| `23503` foreign key violation | `NOT_FOUND` | "That employee no longer exists." |
-| `P0001` raised by our RPCs | mapped by message | "This request was already decided by someone else." |
-| anything else | `INTERNAL` | "Something went wrong. Please try again." + logged with a trace id |
+### Auth (`auth.ts`)
 
-The `42501` row is the safety net that matters: even if a role check is missing
-from an action, RLS rejects the statement and the user gets a clean 403 instead of
-silent data corruption.
+| Action | Effect |
+| --- | --- |
+| `signIn` | Password or magic link, then redirect to the role home |
 
-## 3. Actions by role
+Bookkeeper and invite signup live in the `(auth)` pages and call
+`supabase.auth.signUp` with metadata (`signup_type`, `invitation_token`,
+national id). The trigger writes the real role.
 
-All actions live in `lib/actions/` grouped by domain, each file starting with
-`"use server"`.
+### Time off (`time-off.ts`)
 
-### Shared / any authenticated user
+| Action | Notes |
+| --- | --- |
+| `previewTimeOff` / `submitTimeOffRequest` | Recomputes working days server-side. Optional remaining-day (`unscheduled`) path. Attachments allowed. |
+| `cancelTimeOffRequest` | RPC `cancel_time_off` |
+| `approveTimeOffRequest` / `rejectTimeOffRequest` | RPC `decide_time_off`; reject requires a note |
+| `listPendingApprovals` / `listFirmPendingApprovals` | Manager vs bookkeeper queues; overlap warning |
+| `listDirectReportSummaries` / `managerOverviewStats` | Team table and overview cards |
+| `listManagerCalendar` | Approved + pending dated leave for the month |
 
-| Action | Input | Effect |
-| --- | --- | --- |
-| `updateMyProfile` | `{ fullName, phone, locale }` | Updates own `profiles` row |
-| `getPayslipDownloadUrl` | `{ payslipId }` | Verifies visibility via RLS read, mints a 60s signed URL, audit-logs `payslip.download` |
-| `getDocumentDownloadUrl` | `{ documentId }` | Same for `documents` |
+### People (`employees.ts`)
 
-### Employee
+| Action | Notes |
+| --- | --- |
+| `requestDirectReport` | RPC — creates a team-join request |
+| `decideTeamJoin` / `cancelTeamJoinRequest` | Employee accepts/declines; manager can cancel the ask |
+| `removeDirectReport` | RPC — `manager_id = null` only |
+| `setEmployeeManager` | Bookkeeper assigns a line manager directly |
+| `terminateEmployee` | RPC — status `terminated`, keeps pay history |
+| `applyPayslipLeaveBalances` | Writes remaining days from a parsed slip onto entitlements |
 
-| Action | Input | Notes |
-| --- | --- | --- |
-| `submitTimeOffRequest` | `{ leaveTypeId, startDate, endDate, reason? }` | Server recomputes `working_days` from the company calendar — never trusts the client's number. Checks balance, then inserts as `pending`. |
-| `cancelTimeOffRequest` | `{ requestId }` | Calls `cancel_time_off` RPC; only while `pending` |
+### Businesses and invites (`businesses.ts`, `invitations.ts`)
 
-```ts
-// lib/actions/time-off.ts
-"use server";
+| Action | Notes |
+| --- | --- |
+| `createBusiness` / `listFirmBusinesses` / `removeCompany` | Firm bookkeeper |
+| `getOrCreateCompanyJoinLink` / `rotateCompanyJoinLink` | Reusable employee and manager URLs |
+| `createInvitationLink` / `listBusinessInvitations` | One-time personal invites |
 
-export const submitTimeOffRequest = action({
-  schema: timeOffRequestSchema,
-  roles: ["employee", "manager", "bookkeeper"],
-  async handler(input, ctx) {
-    const employeeId = await requireEmployeeId(ctx);
+### Payroll (`periods.ts`, `payslips.ts`, `parse-payslip.ts`)
 
-    const workingDays = await calcWorkingDays(ctx.supabase, {
-      companyId: ctx.companyId,
-      start: input.startDate,
-      end: input.endDate,
-    });
-    if (workingDays === 0) {
-      throw new AppError("VALIDATION", "Those dates contain no working days.");
-    }
+| Action | Notes |
+| --- | --- |
+| `openPayrollPeriod` / `ensurePayrollPeriod` / `publishPayrollPeriod` | Publish is an RPC so period + slips flip together |
+| `uploadPayslip` | MIME, size, `%PDF` magic bytes, checksum |
+| `parsePayslipAction` | Server parse; matching is a suggestion |
+| `setPayslipManagerShare` / `getPayslipOpenUrl` | Per-file share; signed URL |
 
-    const balance = await getLeaveBalance(ctx.supabase, employeeId, input.leaveTypeId);
-    if (balance.available_days < workingDays) {
-      throw new AppError(
-        "VALIDATION",
-        `You have ${balance.available_days} days available but requested ${workingDays}.`,
-      );
-    }
+### Documents (`documents.ts`)
 
-    const { data, error } = await ctx.supabase
-      .from("time_off_requests")
-      .insert({
-        company_id: ctx.companyId,
-        employee_id: employeeId,
-        leave_type_id: input.leaveTypeId,
-        start_date: input.startDate,
-        end_date: input.endDate,
-        working_days: workingDays,
-        reason: input.reason ?? null,
-      })
-      .select("id")
-      .single();
-    if (error) throw error;   // 23P01 overlap -> CONFLICT, 42501 -> FORBIDDEN
-
-    revalidatePath("/employee/time-off");
-    revalidatePath("/manager/approvals");
-    return data;
-  },
-});
-```
-
-The balance check is a **friendly** pre-check, not the security boundary. It races
-(two tabs could both pass it), and that is fine: the exclusion constraint catches
-the overlapping case in the database, and a manager reviews every request anyway.
-Design principle — application checks exist to give good error messages, database
-constraints exist to guarantee correctness. Confusing the two is how race
-conditions ship.
-
-### Manager
-
-| Action | Input | Notes |
-| --- | --- | --- |
-| `approveTimeOffRequest` | `{ requestId, note? }` | `rpc('decide_time_off', { p_approve: true })` |
-| `rejectTimeOffRequest` | `{ requestId, note }` | Note required when rejecting — a bare "no" is a bad manager experience |
-
-That is the manager's entire write surface: two actions, both funnelled through
-one RPC. Everything else in the manager view is a read.
-
-### Bookkeeper
-
-| Action | Input | Notes |
-| --- | --- | --- |
-| `createEmployee` | employee fields | Validates unique `employee_number` per company |
-| `inviteUserToEmployee` | `{ employeeId, email, role }` | `service_role` admin invite, then links `membership_id` |
-| `createPayrollPeriod` | `{ year, month }` | Idempotent on `(company, year, month)` |
-| `uploadPayslip` | `FormData` with `file` | Validates MIME + size + magic bytes, sha256 for duplicate detection, uploads to Storage, inserts `unassigned` row |
-| `assignPayslip` | `{ payslipId, employeeId }` | Moves the object to the employee's path prefix, sets `status = 'assigned'` |
-| `upsertPayslipComponents` | `{ payslipId, components[] }` | Totals recomputed by trigger |
-| `updateSalaryMetrics` | `{ payslipId, gross?, net?, deductions?, employerCost? }` | Manual override for pay slips without a component breakdown |
-| `publishPayrollPeriod` | `{ periodId }` | Refuses if any pay slip is still `unassigned`; flips period + its pay slips to `published` |
-| `upsertLeaveEntitlement` | `{ employeeId, leaveTypeId, year, entitledDays, carriedOverDays, adjustmentDays, note? }` | Audit-logged with before/after |
-| `uploadDocument` | `FormData` | Forms 106/101, contracts |
-| `searchEmployees` | `{ query }` | Trigram search over name + `employee_number` for the assignment combobox |
-
-`publishPayrollPeriod` is the highest-consequence action in the app — it makes data
-visible to every employee at once — so it is the one that refuses to run on
-incomplete input:
-
-```ts
-export const publishPayrollPeriod = action({
-  schema: z.object({ periodId: z.string().uuid() }),
-  roles: ["bookkeeper"],
-  async handler({ periodId }, ctx) {
-    const { count } = await ctx.supabase
-      .from("payslips")
-      .select("id", { count: "exact", head: true })
-      .eq("period_id", periodId)
-      .eq("status", "unassigned");
-
-    if ((count ?? 0) > 0) {
-      throw new AppError(
-        "VALIDATION",
-        `${count} pay slip(s) are not assigned to an employee yet.`,
-      );
-    }
-    await ctx.supabase.rpc("publish_payroll_period", { p_period_id: periodId });
-    revalidatePath("/bookkeeper/periods");
-    return { published: true };
-  },
-});
-```
-
-The actual flip lives in a `publish_payroll_period` RPC so that updating the period
-row and all its pay slip rows happens in one transaction. Two separate
-`supabase.from(...).update()` calls could leave a period marked published with
-pay slips still hidden.
-
-### Upload validation
-
-Client-side MIME type is a hint, not a fact. `uploadPayslip` checks, in order:
-
-1. `file.size` within 1 byte – 10 MB.
-2. Declared type is `application/pdf`.
-3. **Magic bytes**: the first four bytes are `%PDF`. This is the check that stops a
-   renamed executable, since steps 1–2 are attacker-controlled.
-4. sha256 of the buffer against `payslips.file_checksum` in the same company —
-   catches the bookkeeper re-uploading the same file twice.
-5. Only then upload to Storage, then insert the row.
-
-Storage-then-database ordering means a failed insert leaves an orphaned object
-rather than a database row pointing at a missing file. Orphans are harmless and
-swept by a weekly cron; a row with a dead `file_path` is a broken download button
-for a real user.
+| Action | Notes |
+| --- | --- |
+| `uploadDocument` | Bookkeeper; always an `employeeId` |
+| `uploadOwnForm101` / `storeEmployeeForm101` | Employee Form 101 |
+| `listFirmDocuments` / `listMyDocuments` / `listDocumentsSharedWithManagers` | Cabinets |
+| `setDocumentManagerShare` / `getDocumentDownloadUrl` | Share + signed URL |
 
 ## 4. Route Handlers
 
 | Route | Method | Purpose |
 | --- | --- | --- |
-| `/auth/callback` | GET | Exchanges the magic-link code for a session cookie, redirects to the role's home |
-| `/auth/signout` | POST | Clears the session |
-| `/api/payslips/[id]/download` | GET | Authorizes, then `307` redirects to a signed URL — gives us a stable, shareable-looking link and one audit point |
-| `/api/documents/[id]/download` | GET | Same for documents |
-| `/api/cron/accrue-leave` | POST | Monthly accrual; `service_role`; guarded by `CRON_SECRET` bearer token |
-| `/api/health` | GET | Returns build sha + a trivial DB round trip, for uptime checks |
+| `/auth/callback` | GET | Exchange auth code for a session cookie, redirect home |
+| `/auth/signout` | POST | Clear the session |
+| `/api/payslips/[payslipId]` | GET | `307` to a signed URL after `getPayslipOpenUrl` |
+| `/api/documents/[documentId]` | GET | Same for documents |
+| `/api/time-off/attachments/[attachmentId]` | GET | Same for leave attachments |
+| `/api/payslips/parse` | POST | Multipart PDF → parser (used by bulk upload) |
 
-Cron routes verify the secret in constant time and return 401 otherwise, because
-they run with `service_role` and are the one place an unauthenticated caller could
-cause a privileged write:
+There is **no** `/api/cron/accrue-leave` and **no** `/api/health` in the
+repo. Entitlements are seeded (`ensure_my_leave_entitlements` /
+`seed_leave_entitlements`) and can be adjusted from a parsed pay slip.
 
-```ts
-export async function POST(req: Request) {
-  const auth = req.headers.get("authorization") ?? "";
-  const expected = `Bearer ${process.env.CRON_SECRET}`;
-  const ok =
-    auth.length === expected.length &&
-    timingSafeEqual(Buffer.from(auth), Buffer.from(expected));
-  if (!ok) return new Response("Unauthorized", { status: 401 });
-  // ...
-}
-```
+## 5. RPCs (state machines)
 
-## 5. CRUD matrix
+| RPC | Who | Effect |
+| --- | --- | --- |
+| `decide_time_off` | company manager or bookkeeper | pending → approved/rejected |
+| `cancel_time_off` | the requester | pending → cancelled |
+| `publish_payroll_period` | bookkeeper | draft → published, slips published |
+| `request_direct_report` | manager | pending team-join row |
+| `decide_team_join` | the employee | sets `manager_id` on accept |
+| `cancel_team_join_request` | the manager who asked | pending → cancelled |
+| `remove_direct_report` | that line manager | `manager_id = null` |
+| `terminate_employee` | bookkeeper | `status = terminated` |
+| `remove_company` | bookkeeper | drops a client business |
+| `get_invitation_by_token` | invite page | safe token lookup |
+| `ensure_my_leave_entitlements` | employee | creates this year's rows |
 
-Read as: who may perform each operation, after RLS. "—" means no path exists.
+## 6. CRUD matrix (after RLS)
 
 | Entity | Create | Read | Update | Delete |
 | --- | --- | --- | --- | --- |
-| `profiles` | auth trigger | self, manager (reports), bookkeeper | self | account deletion cascade |
-| `memberships` | bookkeeper (invite) | self, bookkeeper | bookkeeper (`is_active`, `role`) | bookkeeper |
-| `employees` | bookkeeper | self, manager (reports), bookkeeper | bookkeeper | — (status `terminated` instead) |
-| `payroll_periods` | bookkeeper | all members | bookkeeper (until `locked`) | bookkeeper (if empty) |
-| `payslips` | bookkeeper | self+manager if published, bookkeeper always | bookkeeper (until period `locked`) | bookkeeper (unassigned only) |
-| `payslip_components` | bookkeeper | inherits parent | bookkeeper | bookkeeper |
-| `leave_types` | bookkeeper | all members | bookkeeper | — (`is_active = false`) |
-| `leave_entitlements` | bookkeeper | self, manager (reports), bookkeeper | bookkeeper | bookkeeper |
-| `time_off_requests` | **employee (self, pending)** | self, manager (reports), bookkeeper | **RPC only** — manager decides, employee cancels | — (`cancelled` instead) |
-| `documents` | bookkeeper | self, manager (reports), bookkeeper | bookkeeper | bookkeeper |
-| `audit_log` | RPCs only | bookkeeper | — | — |
+| `profiles` | auth trigger | self, colleagues already in scope | self | cascade from auth user |
+| `memberships` | invite trigger / bookkeeper | self, bookkeeper | bookkeeper | bookkeeper |
+| `employees` | invite trigger / bookkeeper | self, company managers, bookkeeper | bookkeeper + team RPCs | — (`terminated`) |
+| `invitations` | bookkeeper / company trigger | bookkeeper, token holder | bookkeeper | bookkeeper |
+| `team_join_requests` | RPC | parties + bookkeeper | RPC only | — |
+| `payroll_periods` | bookkeeper | members | bookkeeper | bookkeeper if unused |
+| `payslips` | bookkeeper | own published; managers if shared; bookkeeper always | bookkeeper until locked | unassigned only |
+| `time_off_requests` | self, pending | self, company managers, bookkeeper | RPC only | — (`cancelled`) |
+| `documents` | bookkeeper; employee Form 101 | owner, shared managers, bookkeeper | share toggle | bookkeeper |
+| `audit_log` | RPCs | bookkeeper | — | — |
 
-Three patterns visible in this table are intentional:
-
-- **Almost nothing is truly deleted.** Payroll and leave records are financial and
-  legal history; `status`/`is_active` columns replace `DELETE` so an audit six
-  months later still has data to look at.
-- **Employees create exactly one kind of row.** The entire employee write surface is
-  one insert into `time_off_requests`. That is what makes the security story small
-  enough to reason about.
-- **Update on `time_off_requests` is RPC-only,** because it is the only entity in the
-  system with a state machine.
+Patterns that still hold: almost nothing is hard-deleted; employees do not
+write payroll; time-off and team-join status changes are RPC-only.

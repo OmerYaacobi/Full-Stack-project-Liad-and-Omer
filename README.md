@@ -3,12 +3,12 @@
 A web portal that lets small businesses share payroll data with their employees
 without doing it over email. Three roles, one app:
 
-- **Employee** — salary insights (averages, fluctuations, deductions), leave
-  balance, download pay slips and forms, submit time-off requests.
-- **Manager** — read-only view of their direct team, approve or reject the team's
-  time-off requests.
-- **Bookkeeper** — upload pay slips, assign them to employees, maintain salary
-  data and leave entitlements.
+- **Employee** — salary insights, leave balance, pay slips and forms, time-off
+  requests, Form 101 upload.
+- **Manager** — own employee workspace plus team overview, leave approvals, a
+  calendar of who is away, and files shared with managers.
+- **Bookkeeper** — a firm that manages several client businesses: upload and
+  parse pay slips, publish months, file HR documents, approve leave when needed.
 
 Final project for Internet Technologies, RUNI CS 2026.
 Built by Liad Pilosof and Omer Yaacobi.
@@ -20,7 +20,7 @@ Built by Liad Pilosof and Omer Yaacobi.
 | Framework | Next.js 16 (App Router) |
 | Language | TypeScript (strict) |
 | Database | Supabase Postgres with Row Level Security |
-| Auth | Supabase Auth |
+| Auth | Supabase Auth (password + magic link) |
 | Files | Supabase Storage (private buckets) |
 | Styling | Tailwind CSS 4 |
 | Validation | Zod |
@@ -39,6 +39,9 @@ npm run dev
 ```
 
 The app runs at http://localhost:3000.
+
+Apply SQL in `supabase/migrations/` in order (0001 through 0012) in the
+Supabase SQL editor if the remote database is behind the repo.
 
 ### Scripts
 
@@ -59,6 +62,7 @@ gitignored and must never be committed.
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase dashboard → Project Settings → API | The project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Same page, "anon" / "publishable" key | Safe in the browser |
+| `DEV_AUTH_ROLE` | Optional, local only | `employee`, `manager`, or `bookkeeper` to skip login for UI work. Ignored in production. |
 
 Two things to understand about these:
 
@@ -70,19 +74,23 @@ every table has Row Level Security enabled, so Postgres decides what each
 logged-in user can read. That is also why the `service_role` key must never be
 added to this file: anything prefixed `NEXT_PUBLIC_` is compiled into the
 JavaScript every visitor downloads, and `service_role` bypasses RLS entirely.
+The app does not use `service_role` today.
 
 ## Project structure
 
 ```
 app/                    App Router pages and layouts
-  page.tsx              /
+  (app)/                Authenticated shell (employee, manager, bookkeeper)
+  (auth)/               Login, signup, invite accept
+  api/                  File open redirects and payslip parse
 lib/
-  env.ts                Environment variable validation
-  supabase/
-    server.ts           Client for Server Components, Actions, Route Handlers
-    client.ts           Client for browser code (auth only)
-    session.ts          Session refresh used by proxy.ts
-proxy.ts                Runs on every request to keep the session fresh
+  actions/              Server Actions (mutations and reads)
+  domain/               Pure leave-day and insight math
+  payslip/              Digital payslip parser (Liad)
+  supabase/             Server, browser, and session clients
+  validations/          Zod schemas shared by forms and actions
+proxy.ts                Session refresh on every request
+supabase/migrations/    Postgres schema, RLS, RPCs (0001–0012)
 docs/
   technical-design/     Architecture, schema, RLS, API, UX
   for-liad-role-security.md
@@ -97,16 +105,19 @@ the library has to write the session cookie itself.
 
 | Document | Contents |
 | --- | --- |
-| [Overview](docs/technical-design/00-overview.md) | Scope, stack rationale, roles, permission matrix |
-| [Database](docs/technical-design/01-database.md) | Schema, constraints, indexes, views |
+| [Overview](docs/technical-design/00-overview.md) | Scope, stack, roles, permission matrix |
+| [Database](docs/technical-design/01-database.md) | Schema, constraints, indexes |
 | [Row Level Security](docs/technical-design/02-rls.md) | Policies for all three roles, Storage rules |
-| [API](docs/technical-design/03-api.md) | Server Actions, Route Handlers, CRUD matrix |
+| [API](docs/technical-design/03-api.md) | Server Actions, Route Handlers, RPCs |
 | [Frontend](docs/technical-design/04-frontend.md) | Folder structure, components, state, errors |
 | [Business logic](docs/technical-design/05-business-logic.md) | Salary maths, leave accounting, state machines |
 | [UX](docs/technical-design/06-ux.md) | Screen-by-screen design per role |
+| [Role security](docs/for-liad-role-security.md) | Why role must not live in `user_metadata` |
 
 ## Status
 
-Foundation in place: Next.js app, Supabase connection, session refresh.
-Next up: authentication (login), then role-based routing, then the first
-end-to-end feature.
+The three role flows are in use: invite-only employee/manager signup, firm
+bookkeepers managing several businesses, pay slips (including PDF parse), time
+off with company-wide approval, team join by consent, Form 101, documents, and
+a manager leave calendar. Schema changes after 0001 live in
+`supabase/migrations/` and must be applied on the Supabase project.

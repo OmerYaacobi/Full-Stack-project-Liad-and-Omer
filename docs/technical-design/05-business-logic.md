@@ -1,106 +1,60 @@
 # Core Business Logic
 
 The logic worth documenting is the part where a reasonable person could pick a
-different answer. All of it lives in `lib/domain/` as pure functions over plain
-inputs, which is also what makes it cheap to unit-test.
+different answer. Pure functions live in `lib/domain/`. Payslip text extraction
+lives in `lib/payslip/parser.ts` (Liad) and is not rewritten here.
 
 ## 1. Salary insights
 
+`buildPayInsights()` in `lib/domain/insights.ts` takes published months only.
+
 ### Averages
 
-Two averages, because they answer different questions:
-
-- **Rolling 12-month average net** — "what do I typically take home?" Uses the last
-  12 *published* periods, ignoring calendar-year boundaries so the number is stable
-  in January instead of resetting.
-- **Year-to-date average** — used for tax-adjacent reasoning, resets each January.
-
-If fewer than 3 periods exist we show "Not enough history yet" rather than an
-average of one month, which would read as precision we do not have.
+- **Rolling 12-month average net** — last 12 published periods, not tied to
+  January. Shown only when there are **at least 3** months; otherwise the
+  UI keeps a dash rather than pretending one month is "typical".
+- **Year-to-date** — total and average for the current calendar year.
+  YTD average needs at least 2 months in that year.
 
 ### Fluctuation
 
-"Fluctuation" is defined as the **coefficient of variation** of net pay over the
-window:
+Coefficient of variation of net pay over the same window:
 
 \[ CV = \frac{\sigma_{net}}{\mu_{net}} \]
 
-Standard deviation alone is not comparable between earners: ₪1,200 of variation is
-noise for a ₪40k salary and rent-threatening for a ₪8k one. Dividing by the mean
-makes it unitless, so the same thresholds work for everyone:
+Sample standard deviation (n − 1). Thresholds:
 
-| CV | Label | Meaning |
-| --- | --- | --- |
-| < 0.05 | Stable | Fixed monthly salary |
-| 0.05 – 0.15 | Some variation | Occasional overtime or bonuses |
-| > 0.15 | Highly variable | Hourly, commission, or irregular components |
+| CV | Label |
+| --- | --- |
+| < 0.05 | Stable |
+| 0.05 – 0.15 | Some variation |
+| > 0.15 | Highly variable |
 
-We use the **sample** standard deviation (`stddev_samp`) because 12 months is a
-sample of an ongoing employment relationship, not the entire population.
+Month-over-month delta is amount and percent vs the previous published
+month, with that month named.
 
-Month-over-month and year-over-year deltas are shown as both absolute and
-percentage change, with the base month named explicitly ("vs. February 2026")
-rather than a bare arrow — an arrow next to a number leaves the reader guessing
-what it is compared against.
-
-One-off components are excluded from the trend line and shown as separate markers.
-A 13th-salary or annual bonus month otherwise makes the CV spike and reports
-"highly variable" for someone on a perfectly fixed salary. Classification comes
-from `payslip_components.code`, which is why the component table exists.
-
-### Deductions
-
-From `payslip_components where kind = 'deduction'`:
-
-- Absolute total and as a share of gross (the effective deduction rate).
-- Breakdown by code: income tax, national insurance, health, pension, study fund.
-- Each line's 12-month trend, which is how an employee discovers that their pension
-  deduction quietly changed in March.
-
-We are careful with language: the app says "deduction rate", never "tax rate", and
-never offers tax advice. It reports what the pay slip says.
+One-off bonus exclusion from the trend was designed; the current trend
+uses each month's net as stored. Language in the UI is "deduction rate",
+never "tax rate".
 
 ### Employer cost
 
-Shown only to managers and the bookkeeper. Employees see their own gross, net, and
-deductions; total employer cost is a budgeting figure for the team view, not a
-personal metric.
+Not shown on the employee dashboard. Team views use latest net and an
+average of those nets, not employer cost.
 
 ## 2. Working-day calculation
 
-Every leave request is measured in working days, computed server-side from company
-data:
+Leave is counted in working days on the server from company weekends and
+holidays. Dates are **`YYYY-MM-DD` strings**, never `Date` in local TZ:
 
 ```ts
-// lib/domain/working-days.ts
-export function countWorkingDays(
-  start: Date,
-  end: Date,
-  weekendDays: number[],          // companies.weekend_days, e.g. [5, 6]
-  holidays: Map<string, { isHalfDay: boolean }>,
-): number {
-  let total = 0;
-  for (const day of eachDayOfInterval({ start, end })) {
-    if (weekendDays.includes(day.getDay())) continue;
-    const holiday = holidays.get(formatISO(day, { representation: "date" }));
-    if (holiday) { total += holiday.isHalfDay ? 0.5 : 0; continue; }
-    total += 1;
-  }
-  return total;
-}
+countWorkingDays(start, end, weekendDays, holidays)
 ```
 
-Deliberate choices:
-
-- **Both endpoints inclusive.** A request for March 3 → March 3 is one day. Users
-  think in "from this day through that day", so the API matches the mental model
-  instead of asking them to add one.
-- **Half-days as 0.5.** Israeli holiday eves are half working days; rounding them
-  to 0 or 1 makes annual balances drift by several days.
-- **Never computed on the client.** The browser would need the holiday table and
-  the client's number could be tampered with. The request form calls a tiny
-  read-only action to *preview* the count; the number that gets stored is
-  recomputed at insert time.
+- Both endpoints inclusive: 3 March → 3 March is one day.
+- Full-day holidays count 0; half-day eves count 0.5.
+- Weekends are skipped even when a holiday lands on them.
+- The form *previews* the count; insert recomputes it.
 
 ## 3. Leave accounting
 
@@ -108,38 +62,23 @@ Deliberate choices:
 available = entitled + carried_over + adjustment − approved − pending
 ```
 
-Four rules that make this behave sensibly:
+1. **Pending consumes balance.**
+2. **Cancel and reject** drop out of the sum and out of the overlap
+   constraint, so days and dates free in the same transaction.
+3. **Unpaid / reserve duty** are separate `leave_types` and do not draw
+   vacation when their accrual is zero.
+4. **Unscheduled remaining-day leave** stores dummy dates of "today" and
+   `unscheduled = true`. Those rows do not occupy the calendar and are
+   excluded from the gist overlap. At most one pending unscheduled row
+   per `(employee, leave_type)`.
+5. **Negative balance** only via bookkeeper `adjustment_days` (or a
+   payslip remaining-day write). `submitTimeOffRequest` refuses an
+   oversize dated request.
 
-1. **Pending consumes balance.** A request that has not been decided still reserves
-   days, so an employee with 5 days left and a pending 5-day request sees 0
-   available. Without this, a manager can approve two requests that together exceed
-   the entitlement.
-2. **Cancellation and rejection release immediately.** Both are excluded from the
-   sum and from the exclusion constraint's `WHERE`, so the days and the dates free
-   up in the same transaction.
-3. **Unpaid and reserve-duty leave do not draw down vacation.** They are separate
-   `leave_types` with `is_paid = false` and zero accrual, tracked for the calendar
-   without touching the vacation balance.
-4. **A negative balance is possible but never automatic.** Only the bookkeeper's
-   `adjustment_days` can push a balance below zero (correcting a prior year, say).
-   No employee-initiated action can, because `submitTimeOffRequest` refuses.
-
-### Monthly accrual
-
-A Vercel Cron hits `/api/cron/accrue-leave` on the 1st of each month. For each
-active employee and each `leave_type` with `accrual_days_per_month > 0`, it adds
-that month's accrual to the current year's entitlement row, prorated by
-`start_date` for anyone who joined mid-month.
-
-The job is **idempotent**: it records the accrued-through month and exits early if
-already run for the current period. Cron platforms retry, and a payroll system
-that hands out an extra vacation day on every retry is a bug you find in December.
-
-### Year-end carryover
-
-On January 1, unused days up to `leave_types.max_carryover_days` move into the new
-year's `carried_over_days`; the remainder expires. Both numbers are written to the
-audit log, because "where did my three days go?" is a question that will be asked.
+There is **no monthly accrual cron**. New people get entitlement rows from
+`seed_leave_entitlements` / `ensure_my_leave_entitlements`. Remaining days
+on a pay slip can be copied onto entitlements by the bookkeeper
+(`applyPayslipLeaveBalances`). Year-end carryover is not automated.
 
 ## 4. State machines
 
@@ -148,76 +87,64 @@ audit log, because "where did my three days go?" is a question that will be aske
 ```mermaid
 stateDiagram-v2
   [*] --> pending : employee submits
-  pending --> approved : manager approves
-  pending --> rejected : manager rejects
+  pending --> approved : manager or bookkeeper approves
+  pending --> rejected : manager or bookkeeper rejects
   pending --> cancelled : employee cancels
   approved --> [*]
   rejected --> [*]
   cancelled --> [*]
 ```
 
-`approved`, `rejected`, and `cancelled` are terminal. An employee who wants to undo
-approved leave submits a new request or talks to their manager — we do not let a
-decided record mutate, because the audit trail is the point. Transitions are
-enforced in `decide_time_off` / `cancel_time_off` under a row lock, so two
-simultaneous decisions serialize rather than race.
+Terminal states do not mutate. Two clicks serialize on `FOR UPDATE`.
+
+### Team join
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending : manager asks
+  pending --> approved : employee accepts (manager_id set)
+  pending --> rejected : employee declines
+  pending --> cancelled : manager withdraws the ask
+```
+
+Bookkeepers skip this and set `manager_id` directly.
 
 ### Pay slip
 
 ```mermaid
 stateDiagram-v2
-  [*] --> unassigned : bookkeeper uploads file
-  unassigned --> assigned : bookkeeper picks employee
-  assigned --> unassigned : bookkeeper unassigns (mistake)
+  [*] --> unassigned : bookkeeper uploads
+  unassigned --> assigned : employee chosen
+  assigned --> unassigned : unassign before publish
   assigned --> published : period published
   published --> [*]
 ```
 
-`unassigned` rows are invisible to employees and managers by RLS, which is what
-makes the "upload 40 files then sort them out" workflow safe. `assigned → unassigned`
-exists because misassignment is the most likely bookkeeper error and it must be
-reversible before publication. After publication it is not: correcting a published
-pay slip means issuing a new one, exactly as in the paper process.
+Unassigned rows are invisible to employees and managers by RLS.
 
 ### Payroll period
 
-`draft → published → locked`. Locking is what makes historical reports
-reproducible: a trigger rejects writes to pay slips in a locked period, so an
-insight computed in June cannot silently change in September.
+`draft → published → locked`. Publishing is one RPC. Locked months reject
+further writes so a number an employee already saw cannot silently change.
 
 ## 5. Pay slip assignment matching
 
-The bookkeeper's real workflow is uploading a folder of PDFs from payroll software,
-often named something like `10234_2026_03.pdf`. Three tiers of help:
+Bulk upload (`SmartBusinessPayslipUpload` + `/api/payslips/parse`):
 
-1. **Filename parse.** Extract candidate employee numbers and year/month. On an
-   exact `(company_id, employee_number)` match, pre-fill the assignment — the
-   bookkeeper confirms rather than searches.
-2. **Trigram name search.** The combobox queries `employees_name_trgm`, so partial
-   or misspelled Hebrew names still resolve.
-3. **Manual selection.** Always available, and always the final word.
+1. Parse the PDF (employee id, name, period, gross/net/deductions, leave
+   remaining).
+2. Match `employees.national_id` / `employee_number` in that company.
+3. Pre-fill assignment. **Nothing is assigned without a human confirm.**
 
-Auto-matching only ever **suggests**. Nothing is assigned without a human click,
-because a wrong assignment shows one employee another's salary — the single worst
-failure this product can have, and not one worth automating away for a few saved
-seconds.
+A wrong assignment shows one employee another's salary — the worst
+failure this product can have — so auto-match only suggests.
 
-Duplicate protection is layered: sha256 catches the same file uploaded twice, and
-`unique (period_id, employee_id)` catches two different files aimed at one person
-for one month.
+Duplicates: sha256 on the file, and `unique (period_id, employee_id)`.
 
-## 6. What the bookkeeper may edit, and why it is logged
+## 6. What the bookkeeper may edit
 
-`updateSalaryMetrics` lets the bookkeeper set gross, net, deductions, and employer
-cost directly, because plenty of small payroll providers hand over a PDF with no
-structured export and someone has to type the numbers in.
-
-Every such edit writes an `audit_log` row with the before and after values.
-Manually editable financial data without an audit trail is indistinguishable from
-tampering, and the bookkeeper is the one person in the system with both the access
-and the motive to be suspected. The log protects them as much as the employees.
-
-Editing is blocked once the period is `locked`, and editing a `published` pay slip
-does not silently change what the employee already downloaded — the UI warns that
-the employee has downloaded this slip and shows the download timestamp from the
-audit log.
+Gross, net, deductions, and leave remaining can be typed or taken from
+the parser. Period publish is the wide-blast action and stays behind an
+explicit confirm. Removing a person is terminate, not delete. Removing a
+business is at the bottom of that business page and is irreversible on
+purpose.
