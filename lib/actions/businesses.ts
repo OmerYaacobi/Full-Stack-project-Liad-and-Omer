@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { fail, fromZod, ok, type ActionResult } from "@/lib/actions/result";
+import { getOrCreateCompanyJoinLink } from "@/lib/actions/invitations";
 import { createClient } from "@/lib/supabase/server";
 import {
   createBusinessSchema,
@@ -179,7 +180,23 @@ export async function createBusiness(input: CreateBusinessInput) {
     },
   ]);
 
-  return { ok: true, data: company };
+  revalidatePath("/bookkeeper");
+  revalidatePath("/bookkeeper/businesses");
+  revalidatePath("/dashboard");
+  revalidatePath(`/bookkeeper/businesses/${company.id}`);
+
+  const join = await getOrCreateCompanyJoinLink(company.id);
+
+  return {
+    ok: true,
+    data: {
+      ...company,
+      employeeJoinUrl: join.ok ? join.data.employee.inviteUrl : null,
+      employeeJoinExpiresAt: join.ok ? join.data.employee.expiresAt : null,
+      managerJoinUrl: join.ok ? join.data.manager.inviteUrl : null,
+      managerJoinExpiresAt: join.ok ? join.data.manager.expiresAt : null,
+    },
+  };
 }
 
 export async function listFirmBusinesses() {
@@ -208,7 +225,7 @@ export async function listFirmBusinesses() {
       currency,
       created_at,
       employees (count),
-      invitations (id, used_at, expires_at)
+      invitations (id, used_at, expires_at, reusable)
     `)
     .eq("firm_id", resolved.firmId)
     .order("created_at", { ascending: false });
@@ -221,7 +238,8 @@ export async function listFirmBusinesses() {
   const formatted = (companies || []).map((c: any) => {
     // Count only pending invitations (not yet accepted and not expired)
     const pendingInvitesCount = (c.invitations || []).filter(
-      (inv: any) => !inv.used_at && new Date(inv.expires_at) > now
+      (inv: { used_at: string | null; expires_at: string; reusable?: boolean }) =>
+        !inv.reusable && !inv.used_at && new Date(inv.expires_at) > now,
     ).length;
 
     return {

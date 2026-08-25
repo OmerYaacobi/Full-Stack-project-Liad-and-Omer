@@ -155,7 +155,8 @@ export default function DashboardPage() {
               Client Businesses & Invitations
             </h1>
             <p className="text-indigo-100 text-xs sm:text-sm mt-1 max-w-xl leading-relaxed">
-              Create client businesses under your firm account, then generate role-based invitation links to onboard workers and team managers.
+              Create client businesses under your firm account. Each one gets
+              separate employee and manager join links.
             </p>
           </div>
 
@@ -190,7 +191,9 @@ export default function DashboardPage() {
               No Client Businesses Yet
             </h3>
             <p className="text-slate-500 text-sm max-w-md mx-auto mb-6 leading-relaxed">
-              Get started by adding your first client business. Once created, you will be able to generate invite links for its workers and managers.
+              Get started by adding your first client business. Once created,
+              you get employee and manager join links to send to the people
+              already working there.
             </p>
             <button
               onClick={() => setIsCreateOpen(true)}

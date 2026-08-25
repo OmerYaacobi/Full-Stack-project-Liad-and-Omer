@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { claimDirectReport } from "@/lib/actions/employees";
+import { requestDirectReport } from "@/lib/actions/employees";
 import type { ClaimableTeammate } from "@/lib/actions/employees";
 
 const FIELD =
@@ -29,10 +29,10 @@ export function ClaimDirectReportForm({
   if (teammates.length === 0) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-medium text-slate-900">Add from the team</h2>
+        <h2 className="text-sm font-medium text-slate-900">Ask someone to join</h2>
         <p className="mt-0.5 text-xs text-slate-500">
-          Everyone at this business already reports to you, or there is nobody
-          else on the payroll yet.
+          Everyone at this business already reports to you, is waiting to
+          accept, or there is nobody else on the payroll yet.
         </p>
       </div>
     );
@@ -46,7 +46,7 @@ export function ClaimDirectReportForm({
         setError(null);
         setSaved(false);
         start(async () => {
-          const result = await claimDirectReport(employeeId);
+          const result = await requestDirectReport(employeeId);
           if (!result.ok) {
             setError(result.error);
             return;
@@ -56,10 +56,10 @@ export function ClaimDirectReportForm({
         });
       }}
     >
-      <h2 className="text-sm font-medium text-slate-900">Add from the team</h2>
+      <h2 className="text-sm font-medium text-slate-900">Ask someone to join</h2>
       <p className="mt-0.5 text-xs text-slate-500">
-        Pick someone at this business. You become their line manager for time
-        off. If they already report to someone else, they move to you.
+        They have to accept before they report to you. If they already report
+        to someone else, accepting moves them to you.
       </p>
 
       <label htmlFor="claimEmployeeId" className="mt-3 block text-sm font-medium text-slate-700">
@@ -93,8 +93,8 @@ export function ClaimDirectReportForm({
       ) : null}
       {saved ? (
         <p role="status" className="mt-2 text-sm text-emerald-700">
-          Added. They will show on your team and their time-off requests come to
-          you.
+          Asked. They will see this on their dashboard and must accept before
+          they join your team.
         </p>
       ) : null}
 
@@ -103,7 +103,7 @@ export function ClaimDirectReportForm({
         disabled={pending || !employeeId}
         className="mt-3 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
       >
-        {pending ? "Adding…" : "Add to my team"}
+        {pending ? "Asking…" : "Ask to join my team"}
       </button>
     </form>
   );

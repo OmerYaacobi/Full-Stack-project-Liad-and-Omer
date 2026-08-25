@@ -29,6 +29,7 @@ export default function InviteSignupPage() {
     phone: "",
     jobTitle: "",
     department: "",
+    role: "employee",
     terms: false,
   });
 
@@ -44,13 +45,20 @@ export default function InviteSignupPage() {
       if (!token) return;
       setLoadingInvite(true);
       const res = await getInvitationDetails(token);
-      if (!res.ok || !res.data) {
+      if (!res.ok || !res.data || (res.data.role !== "employee" && res.data.role !== "manager")) {
         setInviteError(res.error || "Invalid invitation link");
       } else {
-        setInvitationInfo(res.data);
-        if (res.data.email) {
-          setFormData((prev) => ({ ...prev, email: res.data.email || "" }));
-        }
+        const role = res.data.role;
+        setInvitationInfo({
+          companyName: res.data.companyName,
+          role,
+          email: res.data.email,
+        });
+        setFormData((prev) => ({
+          ...prev,
+          email: res.data.email || prev.email,
+          role,
+        }));
       }
       setLoadingInvite(false);
     }
@@ -79,6 +87,7 @@ export default function InviteSignupPage() {
 
     const validationResult = inviteSignupSchema.safeParse({
       ...formData,
+      role: invitationInfo?.role ?? formData.role,
       token,
     });
 
@@ -201,7 +210,7 @@ export default function InviteSignupPage() {
               ? "bg-amber-100 text-amber-800"
               : "bg-emerald-100 text-emerald-800"
           }`}>
-            {isManager ? "👔 Manager Invitation" : "👤 Employee Invitation"}
+            {isManager ? "Manager invitation" : "Employee invitation"}
           </span>
         </div>
         <h1 className="text-2xl font-extrabold text-slate-900">

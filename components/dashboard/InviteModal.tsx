@@ -3,8 +3,12 @@
 import { useState, useEffect } from "react";
 import {
   createInvitationLink,
+  getOrCreateCompanyJoinLink,
   listBusinessInvitations,
+  rotateCompanyJoinLink,
+  type CompanyJoinLink,
 } from "@/lib/actions/invitations";
+import { CompanyJoinLinkCard } from "@/components/invites/company-join-link-card";
 
 interface InviteModalProps {
   isOpen: boolean;
@@ -26,6 +30,9 @@ export function InviteModal({ isOpen, onClose, business }: InviteModalProps) {
 
   const [invitations, setInvitations] = useState<any[]>([]);
   const [loadingInvites, setLoadingInvites] = useState(false);
+  const [joinEmployee, setJoinEmployee] = useState<CompanyJoinLink | null>(null);
+  const [joinManager, setJoinManager] = useState<CompanyJoinLink | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && business?.id) {
@@ -38,9 +45,19 @@ export function InviteModal({ isOpen, onClose, business }: InviteModalProps) {
 
   async function loadInvitations(companyId: string) {
     setLoadingInvites(true);
-    const res = await listBusinessInvitations(companyId);
+    const [res, join] = await Promise.all([
+      listBusinessInvitations(companyId),
+      getOrCreateCompanyJoinLink(companyId),
+    ]);
     if (res.ok && res.data) {
       setInvitations(res.data);
+    }
+    if (join.ok) {
+      setJoinEmployee(join.data.employee);
+      setJoinManager(join.data.manager);
+      setJoinError(null);
+    } else {
+      setJoinError(join.error);
     }
     setLoadingInvites(false);
   }
@@ -97,7 +114,8 @@ export function InviteModal({ isOpen, onClose, business }: InviteModalProps) {
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Generating invitation links for <strong>{business.name}</strong>
+              Share the employee link with the team, and the manager link only
+              with people who should manage others.
             </p>
           </div>
           <button
@@ -116,6 +134,24 @@ export function InviteModal({ isOpen, onClose, business }: InviteModalProps) {
         )}
 
         {/* Generate Link Form */}
+        <div className="mb-6">
+          <CompanyJoinLinkCard
+            companyName={business.name}
+            employee={joinEmployee}
+            manager={joinManager}
+            error={joinError}
+            onRotate={async (joinRole) => {
+              const result = await rotateCompanyJoinLink(business.id, joinRole);
+              if (!result.ok) throw new Error(result.error);
+              if (joinRole === "employee") setJoinEmployee(result.data);
+              else setJoinManager(result.data);
+            }}
+          />
+        </div>
+
+        <p className="text-xs font-bold text-slate-700 mb-3 uppercase tracking-wider">
+          Invite one person
+        </p>
         <form onSubmit={handleGenerate} className="space-y-4 mb-6">
           {/* Role Choice */}
           <div>

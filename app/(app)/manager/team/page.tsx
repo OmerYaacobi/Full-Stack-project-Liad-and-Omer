@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ClaimDirectReportForm } from "@/components/employees/claim-direct-report-form";
+import { OutgoingTeamJoinList } from "@/components/employees/outgoing-team-join-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import {
   getMyEmployeeId,
   listClaimableTeammates,
+  listOutgoingTeamJoinRequests,
 } from "@/lib/actions/employees";
 import { listDirectReportSummaries } from "@/lib/actions/time-off";
 import { requireMembership } from "@/lib/auth/context";
@@ -20,9 +22,12 @@ export default async function ManagerTeamPage() {
   const ctx = await requireMembership();
   const companyId = ctx.membership.company.id;
   const managerId = await getMyEmployeeId(ctx.membership.id);
-  const [reports, claimable] = await Promise.all([
+  const [reports, claimable, outgoing] = await Promise.all([
     listDirectReportSummaries(ctx.membership.id, companyId),
     managerId ? listClaimableTeammates(companyId, managerId) : Promise.resolve([]),
+    managerId
+      ? listOutgoingTeamJoinRequests(managerId)
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -35,7 +40,7 @@ export default async function ManagerTeamPage() {
       {reports.length === 0 ? (
         <EmptyState
           title="No direct reports yet"
-          description="Add someone from the company team below, or wait for a bookkeeper to assign you."
+          description="Ask someone from the company team below. They have to accept before they report to you."
         />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
@@ -101,7 +106,8 @@ export default async function ManagerTeamPage() {
         </div>
       )}
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-4">
+        <OutgoingTeamJoinList requests={outgoing} />
         <ClaimDirectReportForm teammates={claimable} />
       </div>
     </>

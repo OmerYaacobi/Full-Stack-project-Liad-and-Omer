@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { DocumentFolders } from "@/components/documents/document-folders";
+import { IncomingTeamJoinList } from "@/components/employees/incoming-team-join-list";
 import { NetPayTrend } from "@/components/insights/net-pay-trend";
 import { PayInsightCards } from "@/components/insights/pay-insight-cards";
 import { PayslipList } from "@/components/payslips/payslip-list";
@@ -9,6 +10,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { LeaveBalanceCards } from "@/components/time-off/balance-cards";
 import { listMyDocuments } from "@/lib/actions/documents";
+import { listIncomingTeamJoinRequests } from "@/lib/actions/employees";
 import { listMyPayslips } from "@/lib/actions/payslips";
 import { listMyLeaveBalances } from "@/lib/actions/time-off";
 import { requireMembership } from "@/lib/auth/context";
@@ -21,10 +23,11 @@ export const metadata: Metadata = {
 export default async function EmployeeDashboardPage() {
   const ctx = await requireMembership();
   const firstName = ctx.profile?.fullName?.split(" ")[0];
-  const [{ personal }, payslips, balances] = await Promise.all([
+  const [{ personal }, payslips, balances, teamAsks] = await Promise.all([
     listMyDocuments(ctx.membership.id, ctx.membership.company.id),
     listMyPayslips(ctx.membership.id, ctx.membership.company.id),
     listMyLeaveBalances(ctx.membership.id, ctx.membership.company.id),
+    listIncomingTeamJoinRequests(ctx.membership.id),
   ]);
   const insights = buildPayInsights(
     payslips.filter((row) => row.status === "published"),
@@ -37,8 +40,14 @@ export default async function EmployeeDashboardPage() {
     <>
       <PageHeader
         title={firstName ? `Hello, ${firstName}` : "Your dashboard"}
-        description="Last take-home, how it compares, and the leave you still have."
+        description={
+          teamAsks.length > 0
+            ? "A manager asked you to join their team. Answer below, then your pay and leave."
+            : "Last take-home, how it compares, and the leave you still have."
+        }
       />
+
+      <IncomingTeamJoinList requests={teamAsks} />
 
       <PayInsightCards insights={insights} vacation={vacation} sick={sick} />
 

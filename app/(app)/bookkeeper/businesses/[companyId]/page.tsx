@@ -67,14 +67,8 @@ export default async function BusinessPage({
         for this business — upload slips here, then publish the month so employees can open them.
       </p>
 
-      <InvitePeoplePanel
-        companyId={company.id}
-        companyName={company.name}
-        managers={managers.map((row) => ({ id: row.id, fullName: row.fullName }))}
-      />
-
       {activePeople.length > 0 && (
-        <div className="mt-8 space-y-6">
+        <div className="space-y-6">
           <SmartBusinessPayslipUpload
             companyId={companyId}
             employees={activePeople}
@@ -91,7 +85,7 @@ export default async function BusinessPage({
         {employees.length === 0 ? (
           <EmptyState
             title="Nobody on the payroll yet"
-            description="Create an invitation link above. When they open it and choose a password, they appear here."
+            description="Share the employee or manager join link at the bottom of this page. Each person opens the matching link, fills in their details, and appears here."
           />
         ) : (
           <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
@@ -129,6 +123,14 @@ export default async function BusinessPage({
           </ul>
         )}
       </div>
+
+      <section className="mt-12 border-t border-slate-200 pt-8">
+        <InvitePeoplePanel
+          companyId={company.id}
+          companyName={company.name}
+          managers={managers.map((row) => ({ id: row.id, fullName: row.fullName }))}
+        />
+      </section>
 
       <section className="mt-12 border-t border-slate-200 pt-8">
         <h2 className="text-sm font-medium text-slate-900">Remove this business</h2>

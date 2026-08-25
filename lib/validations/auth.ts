@@ -96,6 +96,9 @@ export const inviteSignupSchema = z
       .or(z.literal("")),
     jobTitle: z.string().trim().max(80).optional().or(z.literal("")),
     department: z.string().trim().max(80).optional().or(z.literal("")),
+    role: z.enum(["employee", "manager"], {
+      message: "Choose employee or manager",
+    }),
     terms: z.boolean().refine((val) => val === true, {
       message: "You must accept the Terms of Service and Privacy Policy",
     }),

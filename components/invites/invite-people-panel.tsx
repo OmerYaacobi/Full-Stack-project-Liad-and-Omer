@@ -2,9 +2,13 @@
 
 import { useEffect, useState } from "react";
 
+import { CompanyJoinLinkCard } from "@/components/invites/company-join-link-card";
 import {
   createInvitationLink,
+  getOrCreateCompanyJoinLink,
   listBusinessInvitations,
+  rotateCompanyJoinLink,
+  type CompanyJoinLink,
 } from "@/lib/actions/invitations";
 
 const FIELD =
@@ -37,15 +41,28 @@ export function InvitePeoplePanel({
   const [copied, setCopied] = useState(false);
   const [managerId, setManagerId] = useState("");
   const [invites, setInvites] = useState<InviteRow[]>([]);
+  const [joinEmployee, setJoinEmployee] = useState<CompanyJoinLink | null>(null);
+  const [joinManager, setJoinManager] = useState<CompanyJoinLink | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   useEffect(() => {
     void refresh(companyId);
   }, [companyId]);
 
   async function refresh(id: string) {
-    const result = await listBusinessInvitations(id);
-    if (result.ok && result.data) {
-      setInvites(result.data as InviteRow[]);
+    const [oneTime, join] = await Promise.all([
+      listBusinessInvitations(id),
+      getOrCreateCompanyJoinLink(id),
+    ]);
+    if (oneTime.ok && oneTime.data) {
+      setInvites(oneTime.data as InviteRow[]);
+    }
+    if (join.ok) {
+      setJoinEmployee(join.data.employee);
+      setJoinManager(join.data.manager);
+      setJoinError(null);
+    } else {
+      setJoinError(join.error);
     }
   }
 
@@ -82,14 +99,30 @@ export function InvitePeoplePanel({
   }
 
   return (
+    <div className="space-y-4">
+      <CompanyJoinLinkCard
+        companyName={companyName}
+        employee={joinEmployee}
+        manager={joinManager}
+        error={joinError}
+        onRotate={async (role) => {
+          const result = await rotateCompanyJoinLink(companyId, role);
+          if (!result.ok) {
+            throw new Error(result.error);
+          }
+          if (role === "employee") setJoinEmployee(result.data);
+          else setJoinManager(result.data);
+        }}
+      />
+
     <section className="rounded-xl border border-slate-200 bg-white p-4">
       <h2 className="text-sm font-medium text-slate-900">
-        Add an employee or manager
+        Invite one person
       </h2>
       <p className="mt-0.5 text-xs text-slate-500">
-        Create a one-time link. They open it, choose a password, and join{" "}
-        {companyName} with the role you pick. You cannot set their password
-        here — that stays theirs.
+        Optional. Create a one-time link locked to a role — useful when you want
+        to assign a line manager or restrict the email. For a group of people
+        already at this business, copy the matching team join link above.
       </p>
 
       <form onSubmit={onSubmit} className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -254,6 +287,7 @@ export function InvitePeoplePanel({
         </ul>
       )}
     </section>
+    </div>
   );
 }
 

@@ -19,6 +19,10 @@ const employeeIdSchema = z.object({
   employeeId: z.string().uuid(),
 });
 
+const requestIdSchema = z.object({
+  requestId: z.string().uuid(),
+});
+
 export type CompanyEmployee = {
   id: string;
   fullName: string;
@@ -157,6 +161,7 @@ export async function setEmployeeManager(
   revalidatePath("/manager");
   revalidatePath("/manager/team");
   revalidatePath("/manager/approvals");
+  revalidatePath("/employee");
   return ok(undefined);
 }
 
@@ -167,21 +172,37 @@ export type ClaimableTeammate = {
   managerName: string | null;
 };
 
+export type TeamJoinRequest = {
+  id: string;
+  createdAt: string;
+  employeeId: string;
+  employeeName: string;
+  managerId: string;
+  managerName: string;
+  managerJobTitle: string | null;
+};
+
 /**
- * People at this business who do not already report to the signed-in manager.
- * Used so a manager can add reports without waiting on a bookkeeper.
+ * People at this business who do not already report to the signed-in manager
+ * and have no pending ask from them. Asking still needs the other person to
+ * accept before they join the team.
  */
 export async function listClaimableTeammates(
   companyId: string,
   managerEmployeeId: string,
 ): Promise<ClaimableTeammate[]> {
-  const people = await listCompanyEmployees(companyId);
+  const [people, outgoing] = await Promise.all([
+    listCompanyEmployees(companyId),
+    listOutgoingTeamJoinRequests(managerEmployeeId),
+  ]);
+  const waiting = new Set(outgoing.map((row) => row.employeeId));
   return people
     .filter(
       (row) =>
         row.id !== managerEmployeeId &&
         row.managerId !== managerEmployeeId &&
-        row.status !== "terminated",
+        row.status !== "terminated" &&
+        !waiting.has(row.id),
     )
     .map((row) => ({
       id: row.id,
@@ -191,7 +212,81 @@ export async function listClaimableTeammates(
     }));
 }
 
-export async function claimDirectReport(
+export async function listOutgoingTeamJoinRequests(
+  managerEmployeeId: string,
+): Promise<TeamJoinRequest[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("team_join_requests")
+    .select("id, created_at, manager_id, employee_id")
+    .eq("manager_id", managerEmployeeId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (error || !data?.length) return [];
+
+  const { data: people } = await supabase
+    .from("employees")
+    .select("id, full_name")
+    .in(
+      "id",
+      data.map((row) => row.employee_id),
+    );
+
+  const names = new Map((people ?? []).map((row) => [row.id, row.full_name]));
+
+  return data.map((row) => ({
+    id: row.id,
+    createdAt: row.created_at,
+    employeeId: row.employee_id,
+    employeeName: names.get(row.employee_id) ?? "Employee",
+    managerId: row.manager_id,
+    managerName: "",
+    managerJobTitle: null,
+  }));
+}
+
+export async function listIncomingTeamJoinRequests(
+  membershipId: string,
+): Promise<TeamJoinRequest[]> {
+  const employeeId = await getMyEmployeeId(membershipId);
+  if (!employeeId) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("team_join_requests")
+    .select("id, created_at, manager_id, employee_id")
+    .eq("employee_id", employeeId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (error || !data?.length) return [];
+
+  const { data: managers } = await supabase
+    .from("employees")
+    .select("id, full_name, job_title")
+    .in(
+      "id",
+      data.map((row) => row.manager_id),
+    );
+
+  const byId = new Map((managers ?? []).map((row) => [row.id, row]));
+
+  return data.map((row) => {
+    const manager = byId.get(row.manager_id);
+    return {
+      id: row.id,
+      createdAt: row.created_at,
+      employeeId: row.employee_id,
+      employeeName: "",
+      managerId: row.manager_id,
+      managerName: manager?.full_name ?? "A manager",
+      managerJobTitle: manager?.job_title ?? null,
+    };
+  });
+}
+
+export async function requestDirectReport(
   employeeId: string,
 ): Promise<ActionResult<void>> {
   const parsed = employeeIdSchema.safeParse({ employeeId });
@@ -204,13 +299,50 @@ export async function claimDirectReport(
     .eq("id", parsed.data.employeeId)
     .maybeSingle();
 
-  const { error } = await supabase.rpc("claim_direct_report", {
+  const { error } = await supabase.rpc("request_direct_report", {
     p_employee_id: parsed.data.employeeId,
   });
   if (error) return mapPeopleError(error);
 
   revalidateTeamPaths(employee?.company_id ?? null);
   revalidatePath(`/manager/team/${parsed.data.employeeId}`);
+  return ok(undefined);
+}
+
+export async function decideTeamJoin(
+  requestId: string,
+  approve: boolean,
+): Promise<ActionResult<void>> {
+  const parsed = requestIdSchema.safeParse({ requestId });
+  if (!parsed.success) return fromZod(parsed.error);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("decide_team_join", {
+    p_request_id: parsed.data.requestId,
+    p_approve: approve,
+  });
+  if (error) return mapPeopleError(error);
+
+  revalidateTeamPaths(null);
+  revalidatePath("/employee");
+  revalidatePath("/employee/time-off");
+  return ok(undefined);
+}
+
+export async function cancelTeamJoinRequest(
+  requestId: string,
+): Promise<ActionResult<void>> {
+  const parsed = requestIdSchema.safeParse({ requestId });
+  if (!parsed.success) return fromZod(parsed.error);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("cancel_team_join_request", {
+    p_request_id: parsed.data.requestId,
+  });
+  if (error) return mapPeopleError(error);
+
+  revalidateTeamPaths(null);
+  revalidatePath("/employee");
   return ok(undefined);
 }
 
@@ -385,6 +517,7 @@ function revalidateTeamPaths(companyId: string | null) {
   revalidatePath("/manager");
   revalidatePath("/manager/team");
   revalidatePath("/manager/approvals");
+  revalidatePath("/employee");
   if (companyId) {
     revalidatePath(`/bookkeeper/businesses/${companyId}`);
   }
@@ -406,6 +539,21 @@ function mapPeopleError(error: { code?: string; message?: string }): ActionResul
   }
   if (/ALREADY_REMOVED/i.test(message)) {
     return fail("CONFLICT", "That person is already off the payroll.");
+  }
+  if (/ALREADY_PENDING/i.test(message)) {
+    return fail("CONFLICT", "You already asked this person. Wait for them to answer.");
+  }
+  if (/ALREADY_ON_TEAM/i.test(message)) {
+    return fail("CONFLICT", "They already report to you.");
+  }
+  if (/ALREADY_DECIDED/i.test(message)) {
+    return fail("CONFLICT", "That ask was already answered.");
+  }
+  if (/NOT_YOUR_REQUEST/i.test(message)) {
+    return fail("FORBIDDEN", "That ask is not yours to answer.");
+  }
+  if (/REQUEST_NOT_FOUND/i.test(message)) {
+    return fail("NOT_FOUND", "That ask is no longer open.");
   }
   if (/EMPLOYEE_NOT_FOUND/i.test(message) || error.code === "P0002") {
     return fail("NOT_FOUND", "That person is no longer on this payroll.");

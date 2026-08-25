@@ -93,21 +93,30 @@ export async function getInvitationDetails(token: string) {
   const { data: rpcData, error: rpcError } = await supabase
     .rpc("get_invitation_by_token", { p_token: cleanToken });
 
-  let invitation: any = null;
+  let invitation: {
+    token: string;
+    role: "employee" | "manager" | null;
+    email: string | null;
+    expires_at: string;
+    used_at: string | null;
+    reusable: boolean;
+    companyName: string;
+    companyTaxId: string;
+  } | null = null;
+
   if (!rpcError && rpcData && rpcData.length > 0) {
     const row = rpcData[0];
     invitation = {
-      id: row.id,
       token: row.token,
       role: row.role,
       email: row.email,
       expires_at: row.expires_at,
       used_at: row.used_at,
+      reusable: Boolean(row.reusable),
       companyName: row.company_name,
       companyTaxId: row.company_tax_id,
     };
   } else {
-    // 2. Fallback to direct query
     const { data: directData } = await supabase
       .from("invitations")
       .select(`
@@ -117,6 +126,7 @@ export async function getInvitationDetails(token: string) {
         email,
         expires_at,
         used_at,
+        reusable,
         companies (
           id,
           name,
@@ -131,12 +141,12 @@ export async function getInvitationDetails(token: string) {
         ? directData.companies[0]
         : directData.companies;
       invitation = {
-        id: directData.id,
         token: directData.token,
         role: directData.role,
         email: directData.email,
         expires_at: directData.expires_at,
         used_at: directData.used_at,
+        reusable: Boolean(directData.reusable),
         companyName: company?.name || "Company",
         companyTaxId: company?.tax_id || "",
       };
@@ -147,7 +157,7 @@ export async function getInvitationDetails(token: string) {
     return { ok: false, error: "Invitation not found or has been removed." };
   }
 
-  if (invitation.used_at) {
+  if (!invitation.reusable && invitation.used_at) {
     return { ok: false, error: "This invitation link has already been used." };
   }
 
@@ -162,7 +172,8 @@ export async function getInvitationDetails(token: string) {
     ok: true,
     data: {
       token: invitation.token,
-      role: invitation.role as "employee" | "manager",
+      role: invitation.role === "manager" ? "manager" : "employee",
+      reusable: invitation.reusable,
       email: invitation.email,
       companyName: invitation.companyName || "Company",
       companyTaxId: invitation.companyTaxId || "",
@@ -192,9 +203,11 @@ export async function listBusinessInvitations(companyId: string) {
       email,
       expires_at,
       used_at,
-      created_at
+      created_at,
+      reusable
     `)
     .eq("company_id", companyId)
+    .eq("reusable", false)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -202,4 +215,203 @@ export async function listBusinessInvitations(companyId: string) {
   }
 
   return { ok: true, data: invitations || [] };
+}
+
+export type CompanyJoinLink = {
+  role: "employee" | "manager";
+  token: string;
+  expiresAt: string;
+  inviteUrl: string;
+};
+
+export type CompanyJoinLinks = {
+  employee: CompanyJoinLink;
+  manager: CompanyJoinLink;
+};
+
+type JoinResult =
+  | { ok: true; data: CompanyJoinLinks }
+  | { ok: false; error: string };
+
+type OneJoinResult =
+  | { ok: true; data: CompanyJoinLink }
+  | { ok: false; error: string };
+
+function toJoinLink(row: {
+  role: "employee" | "manager" | string;
+  token: string;
+  expires_at: string;
+}): CompanyJoinLink {
+  const role = row.role === "manager" ? "manager" : "employee";
+  return {
+    role,
+    token: row.token,
+    expiresAt: row.expires_at,
+    inviteUrl: `/invite/${row.token}`,
+  };
+}
+
+async function readReusableInvites(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  companyId: string,
+) {
+  const { data, error } = await supabase
+    .from("invitations")
+    .select("id, token, expires_at, role")
+    .eq("company_id", companyId)
+    .eq("reusable", true);
+
+  if (error || !data?.length) return [];
+  return data as {
+    id: string;
+    token: string;
+    expires_at: string;
+    role: "employee" | "manager";
+  }[];
+}
+
+async function insertReusableInvite(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  companyId: string,
+  userId: string,
+  role: "employee" | "manager",
+) {
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 90);
+  return supabase.from("invitations").insert({
+    company_id: companyId,
+    role,
+    reusable: true,
+    created_by: userId,
+    expires_at: expiresAt.toISOString(),
+  });
+}
+
+export async function getOrCreateCompanyJoinLink(
+  companyId: string,
+): Promise<JoinResult> {
+  if (!companyId) {
+    return { ok: false, error: "Missing company ID" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  let rows = await readReusableInvites(supabase, companyId);
+  const have = new Set(rows.map((row) => row.role));
+
+  for (const role of ["employee", "manager"] as const) {
+    if (have.has(role)) continue;
+    const { error } = await insertReusableInvite(
+      supabase,
+      companyId,
+      user.id,
+      role,
+    );
+    if (error && !/uniq_company_reusable_invite|23505/.test(error.message)) {
+      if (/reusable/i.test(error.message)) {
+        return {
+          ok: false,
+          error:
+            "This database is missing team join links. Run 0012_company_join_links.sql in Supabase.",
+        };
+      }
+      return { ok: false, error: error.message };
+    }
+  }
+
+  rows = await readReusableInvites(supabase, companyId);
+  const employee = rows.find((row) => row.role === "employee");
+  const manager = rows.find((row) => row.role === "manager");
+  if (!employee || !manager) {
+    return { ok: false, error: "Could not create team join links." };
+  }
+
+  const now = Date.now();
+  if (new Date(employee.expires_at).getTime() < now) {
+    const rotated = await rotateCompanyJoinLink(companyId, "employee");
+    if (!rotated.ok) return rotated;
+  }
+  if (new Date(manager.expires_at).getTime() < now) {
+    const rotated = await rotateCompanyJoinLink(companyId, "manager");
+    if (!rotated.ok) return rotated;
+  }
+
+  rows = await readReusableInvites(supabase, companyId);
+  const employeeRow = rows.find((row) => row.role === "employee");
+  const managerRow = rows.find((row) => row.role === "manager");
+  if (!employeeRow || !managerRow) {
+    return { ok: false, error: "Could not create team join links." };
+  }
+
+  return {
+    ok: true,
+    data: {
+      employee: toJoinLink(employeeRow),
+      manager: toJoinLink(managerRow),
+    },
+  };
+}
+
+export async function rotateCompanyJoinLink(
+  companyId: string,
+  role: "employee" | "manager",
+): Promise<OneJoinResult> {
+  if (!companyId) {
+    return { ok: false, error: "Missing company ID" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const rows = await readReusableInvites(supabase, companyId);
+  const existing = rows.find((row) => row.role === role);
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 90);
+  const token =
+    crypto.randomUUID().replace(/-/g, "") +
+    crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from("invitations")
+      .update({
+        token,
+        expires_at: expiresAt.toISOString(),
+        used_at: null,
+        used_by: null,
+      })
+      .eq("id", existing.id)
+      .select("token, expires_at, role")
+      .single();
+
+    if (error || !data) {
+      return { ok: false, error: error?.message || "Could not refresh the link." };
+    }
+
+    revalidatePath(`/bookkeeper/businesses/${companyId}`);
+    return { ok: true, data: toJoinLink(data) };
+  }
+
+  const created = await insertReusableInvite(supabase, companyId, user.id, role);
+  if (created.error && !/23505/.test(created.error.message)) {
+    return { ok: false, error: created.error.message };
+  }
+  const again = (await readReusableInvites(supabase, companyId)).find(
+    (row) => row.role === role,
+  );
+  if (!again) {
+    return { ok: false, error: "Could not create that team join link." };
+  }
+  return { ok: true, data: toJoinLink(again) };
 }
