@@ -143,26 +143,27 @@ export default function InviteSignupPage() {
 
   if (loadingInvite) {
     return (
-      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl p-10 shadow-sm text-center">
+      <div className="w-full max-w-lg bg-white/95 backdrop-blur-sm border border-slate-200/80 rounded-3xl p-10 shadow-xl shadow-slate-200/50 text-center">
         <div className="animate-spin h-8 w-8 text-indigo-600 mx-auto mb-4 border-4 border-indigo-600 border-t-transparent rounded-full" />
-        <p className="text-slate-600 font-medium">Validating invitation link...</p>
+        <p className="text-slate-700 font-bold text-sm">Validating invitation link...</p>
+        <p className="text-slate-400 text-xs mt-1">Please wait a moment.</p>
       </div>
     );
   }
 
   if (inviteError || !invitationInfo) {
     return (
-      <div className="w-full max-w-lg bg-white border border-red-200 rounded-2xl p-8 shadow-sm text-center">
-        <div className="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-2xl mx-auto mb-4">
+      <div className="w-full max-w-lg bg-white/95 backdrop-blur-sm border border-red-200/80 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-200/50 text-center">
+        <div className="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-sm shadow-red-500/20">
           ✕
         </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">Invalid Invitation</h2>
+        <h2 className="text-2xl font-extrabold text-slate-900 mb-2">Invalid Invitation</h2>
         <p className="text-slate-600 text-sm mb-6 leading-relaxed">
-          {inviteError || "This invitation link is invalid or has expired."}
+          {inviteError || "This invitation link is invalid or has expired. Please ask your administrator for a new invite link."}
         </p>
         <Link
           href="/"
-          className="inline-flex justify-center items-center px-5 py-2.5 rounded-lg bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition text-sm"
+          className="inline-flex justify-center items-center px-6 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition text-sm shadow-xs"
         >
           Return to Home
         </Link>
@@ -174,17 +175,17 @@ export default function InviteSignupPage() {
 
   if (isSuccess) {
     return (
-      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl p-8 sm:p-10 shadow-sm text-center">
-        <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+      <div className="w-full max-w-lg bg-white/95 backdrop-blur-sm border border-slate-200/80 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-200/50 text-center">
+        <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-sm shadow-emerald-500/20">
           ✓
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">
+        <h2 className="text-2xl font-extrabold text-slate-900 mb-2">
           Welcome to {invitationInfo.companyName}!
         </h2>
         <p className="text-slate-600 text-sm mb-6 leading-relaxed">
           Your account has been created with the role of{" "}
-          <strong className="text-slate-900">
-            {isManager ? "Team Manager" : "Regular Employee"}
+          <strong className="text-slate-900 font-bold">
+            {isManager ? "Team Manager" : "Employee"}
           </strong>.
           <br className="my-2" />
           A verification link has been sent to{" "}
@@ -192,264 +193,330 @@ export default function InviteSignupPage() {
         </p>
         <Link
           href="/login"
-          className="inline-flex justify-center items-center px-6 py-2.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition text-sm"
+          className="inline-flex justify-center items-center px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow-sm text-sm"
         >
-          Sign in
+          Sign In to Your Account →
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-xl bg-white border border-slate-200 rounded-2xl p-6 sm:p-10 shadow-sm text-left">
+    <div className="w-full max-w-2xl bg-white/95 backdrop-blur-sm border border-slate-200/80 rounded-3xl p-6 sm:p-10 shadow-xl shadow-slate-200/50 text-left transition-all">
       {/* Header with Invited Business & Role badge */}
       <div className="border-b border-slate-100 pb-5 mb-6">
         <div className="flex items-center gap-2 mb-2">
-          <span className={`px-2.5 py-1 text-xs font-bold rounded-full ${
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold tracking-wider uppercase rounded-full border ${
             isManager
-              ? "bg-amber-100 text-amber-800"
-              : "bg-emerald-100 text-emerald-800"
+              ? "bg-amber-50 text-amber-800 border-amber-200/80"
+              : "bg-emerald-50 text-emerald-800 border-emerald-200/80"
           }`}>
-            {isManager ? "Manager invitation" : "Employee invitation"}
+            <span>{isManager ? "👔" : "👤"}</span>
+            <span>{isManager ? "Manager Invitation" : "Employee Invitation"}</span>
           </span>
         </div>
-        <h1 className="text-2xl font-extrabold text-slate-900">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
           Join {invitationInfo.companyName}
         </h1>
-        <p className="text-slate-600 text-xs sm:text-sm mt-1">
-          You have been invited to join as a{" "}
-          <strong className="text-slate-800">
-            {isManager ? "Team Manager" : "Regular Employee"}
-          </strong>. Fill out your details below to activate your account.
+        <p className="text-slate-500 text-xs sm:text-sm mt-1">
+          Activate your {isManager ? "team manager" : "employee"} account to view your payslips and employment records.
         </p>
       </div>
 
       {generalError && (
-        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-3">
-          <span className="text-lg">⚠️</span>
-          <div className="flex-1">{generalError}</div>
+        <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-3 shadow-xs">
+          <span className="text-lg shrink-0">⚠️</span>
+          <div className="flex-1 font-medium leading-relaxed">{generalError}</div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {/* Full Name & National ID */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="fullName" className="block text-xs font-semibold text-slate-700 mb-1">
-              Full Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="fullName"
-              name="fullName"
-              type="text"
-              required
-              value={formData.fullName}
-              onChange={handleChange}
-              placeholder="e.g. Jane Doe"
-              className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
-                fieldErrors.fullName
-                  ? "border-red-400 focus:ring-red-200"
-                  : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-              } focus:outline-none focus:ring-2 transition`}
-            />
-            {fieldErrors.fullName && (
-              <p className="text-xs text-red-600 mt-1">{fieldErrors.fullName}</p>
-            )}
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+        {/* Section 1: Personal Details */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
+            <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px]">
+              1
+            </span>
+            <span>Personal Information</span>
           </div>
 
-          <div>
-            <label htmlFor="nationalId" className="block text-xs font-semibold text-slate-700 mb-1">
-              National ID / ת.ז <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="nationalId"
-              name="nationalId"
-              type="text"
-              required
-              maxLength={9}
-              value={formData.nationalId}
-              onChange={handleChange}
-              placeholder="e.g. 012345678"
-              className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
-                fieldErrors.nationalId
-                  ? "border-red-400 focus:ring-red-200"
-                  : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-              } focus:outline-none focus:ring-2 transition`}
-            />
-            {fieldErrors.nationalId && (
-              <p className="text-xs text-red-600 mt-1">{fieldErrors.nationalId}</p>
-            )}
-          </div>
-        </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="fullName" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="fullName"
+                name="fullName"
+                type="text"
+                required
+                value={formData.fullName}
+                onChange={handleChange}
+                placeholder="e.g. Jane Doe"
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
+                  fieldErrors.fullName
+                    ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                    : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+                } focus:outline-none focus:ring-4 transition shadow-xs`}
+              />
+              {fieldErrors.fullName && (
+                <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                  <span>•</span>
+                  <span>{fieldErrors.fullName}</span>
+                </p>
+              )}
+            </div>
 
-        {/* Email & Phone */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="email" className="block text-xs font-semibold text-slate-700 mb-1">
-              Email Address <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              disabled={Boolean(invitationInfo.email)}
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="jane@example.com"
-              className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
-                fieldErrors.email
-                  ? "border-red-400 focus:ring-red-200"
-                  : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-              } disabled:bg-slate-100 disabled:text-slate-500 focus:outline-none focus:ring-2 transition`}
-            />
-            {fieldErrors.email && (
-              <p className="text-xs text-red-600 mt-1">{fieldErrors.email}</p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="phone" className="block text-xs font-semibold text-slate-700 mb-1">
-              Phone Number (Optional)
-            </label>
-            <input
-              id="phone"
-              name="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="050-1234567"
-              className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
-                fieldErrors.phone
-                  ? "border-red-400 focus:ring-red-200"
-                  : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-              } focus:outline-none focus:ring-2 transition`}
-            />
-            {fieldErrors.phone && (
-              <p className="text-xs text-red-600 mt-1">{fieldErrors.phone}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Password & Confirm */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="password" className="block text-xs font-semibold text-slate-700 mb-1">
-              Password <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="At least 6 characters"
-              className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
-                fieldErrors.password
-                  ? "border-red-400 focus:ring-red-200"
-                  : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-              } focus:outline-none focus:ring-2 transition`}
-            />
-            {fieldErrors.password && (
-              <p className="text-xs text-red-600 mt-1">{fieldErrors.password}</p>
-            )}
+            <div>
+              <label htmlFor="nationalId" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                National ID / ת.ז <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="nationalId"
+                name="nationalId"
+                type="text"
+                required
+                maxLength={9}
+                value={formData.nationalId}
+                onChange={handleChange}
+                placeholder="e.g. 012345678"
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
+                  fieldErrors.nationalId
+                    ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                    : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+                } focus:outline-none focus:ring-4 transition shadow-xs`}
+              />
+              {fieldErrors.nationalId && (
+                <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                  <span>•</span>
+                  <span>{fieldErrors.nationalId}</span>
+                </p>
+              )}
+            </div>
           </div>
 
-          <div>
-            <label htmlFor="confirmPassword" className="block text-xs font-semibold text-slate-700 mb-1">
-              Confirm Password <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              required
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              placeholder="Re-enter password"
-              className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
-                fieldErrors.confirmPassword
-                  ? "border-red-400 focus:ring-red-200"
-                  : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-              } focus:outline-none focus:ring-2 transition`}
-            />
-            {fieldErrors.confirmPassword && (
-              <p className="text-xs text-red-600 mt-1">{fieldErrors.confirmPassword}</p>
-            )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="email" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                Email Address <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                disabled={Boolean(invitationInfo.email)}
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="jane@example.com"
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
+                  fieldErrors.email
+                    ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                    : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+                } disabled:bg-slate-100 disabled:text-slate-500 focus:outline-none focus:ring-4 transition shadow-xs`}
+              />
+              {fieldErrors.email && (
+                <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                  <span>•</span>
+                  <span>{fieldErrors.email}</span>
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="phone" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                Phone Number <span className="text-slate-400 font-normal">(Optional)</span>
+              </label>
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="050-1234567"
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
+                  fieldErrors.phone
+                    ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                    : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+                } focus:outline-none focus:ring-4 transition shadow-xs`}
+              />
+              {fieldErrors.phone && (
+                <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                  <span>•</span>
+                  <span>{fieldErrors.phone}</span>
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Optional Department & Title */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-          <div>
-            <label htmlFor="department" className="block text-xs font-semibold text-slate-700 mb-1">
-              Department / Team (Optional)
-            </label>
-            <input
-              id="department"
-              name="department"
-              type="text"
-              value={formData.department}
-              onChange={handleChange}
-              placeholder="e.g. Sales, Operations"
-              className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-indigo-100 focus:outline-none focus:ring-2 transition"
-            />
+        {/* Section 2: Security & Password */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
+            <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px]">
+              2
+            </span>
+            <span>Security &amp; Password</span>
           </div>
 
-          <div>
-            <label htmlFor="jobTitle" className="block text-xs font-semibold text-slate-700 mb-1">
-              Job Title (Optional)
-            </label>
-            <input
-              id="jobTitle"
-              name="jobTitle"
-              type="text"
-              value={formData.jobTitle}
-              onChange={handleChange}
-              placeholder="e.g. Account Executive"
-              className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-indigo-100 focus:outline-none focus:ring-2 transition"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="password" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                Password <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="At least 6 characters"
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
+                  fieldErrors.password
+                    ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                    : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+                } focus:outline-none focus:ring-4 transition shadow-xs`}
+              />
+              {fieldErrors.password && (
+                <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                  <span>•</span>
+                  <span>{fieldErrors.password}</span>
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                Confirm Password <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                required
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="Re-enter password"
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
+                  fieldErrors.confirmPassword
+                    ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                    : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+                } focus:outline-none focus:ring-4 transition shadow-xs`}
+              />
+              {fieldErrors.confirmPassword && (
+                <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                  <span>•</span>
+                  <span>{fieldErrors.confirmPassword}</span>
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: Role Info */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
+            <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px]">
+              3
+            </span>
+            <span>Role Details <span className="text-slate-400 font-normal">(Optional)</span></span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="department" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                Department / Team
+              </label>
+              <input
+                id="department"
+                name="department"
+                type="text"
+                value={formData.department}
+                onChange={handleChange}
+                placeholder="e.g. Operations, Sales"
+                className="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 focus:outline-none transition shadow-xs"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="jobTitle" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                Job Title
+              </label>
+              <input
+                id="jobTitle"
+                name="jobTitle"
+                type="text"
+                value={formData.jobTitle}
+                onChange={handleChange}
+                placeholder="e.g. Account Specialist"
+                className="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 focus:outline-none transition shadow-xs"
+              />
+            </div>
           </div>
         </div>
 
         {/* Terms */}
-        <div className="pt-2">
-          <label className="flex items-start gap-2 cursor-pointer">
+        <div className="pt-1">
+          <label className="flex items-start gap-2.5 cursor-pointer select-none">
             <input
               type="checkbox"
               name="terms"
               checked={formData.terms}
               onChange={handleChange}
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              className="mt-0.5 h-4 w-4 rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500"
             />
-            <span className="text-xs text-slate-600 leading-tight">
-              I agree to the <span className="text-indigo-600 underline">Terms of Service</span> and <span className="text-indigo-600 underline">Privacy Policy</span>.
+            <span className="text-xs text-slate-600 leading-relaxed">
+              I agree to the{" "}
+              <span className="text-indigo-600 font-semibold underline cursor-pointer hover:text-indigo-800">
+                Terms of Service
+              </span>{" "}
+              and{" "}
+              <span className="text-indigo-600 font-semibold underline cursor-pointer hover:text-indigo-800">
+                Privacy Policy
+              </span>
+              .
             </span>
           </label>
           {fieldErrors.terms && (
-            <p className="text-xs text-red-600 mt-1">{fieldErrors.terms}</p>
+            <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+              <span>•</span>
+              <span>{fieldErrors.terms}</span>
+            </p>
           )}
         </div>
 
-        {/* Submit */}
-        <div className="pt-4">
+        {/* Submit Button */}
+        <div className="pt-2">
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`w-full py-3 px-4 text-white font-bold rounded-xl shadow-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed ${
+            className={`w-full py-3.5 px-4 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed text-sm ${
               isManager
-                ? "bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300"
-                : "bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300"
+                ? "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20 disabled:bg-slate-300"
+                : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20 disabled:bg-slate-300"
             }`}
           >
             {isSubmitting ? (
-              <span>Activating Account...</span>
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Activating Account...</span>
+              </>
             ) : (
-              <span>Join {invitationInfo.companyName} as {isManager ? "Manager" : "Employee"}</span>
+              <>
+                <span>Join {invitationInfo.companyName} as {isManager ? "Manager" : "Employee"}</span>
+                <span className="font-normal opacity-70">→</span>
+              </>
             )}
           </button>
         </div>
+
+        <p className="border-t border-slate-100 pt-5 text-center text-xs text-slate-500">
+          Already have an account?{" "}
+          <Link href="/login" className="font-bold text-indigo-600 hover:text-indigo-800 transition">
+            Sign in here →
+          </Link>
+        </p>
       </form>
     </div>
   );

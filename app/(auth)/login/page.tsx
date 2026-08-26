@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
-  title: "Sign in",
+  title: "Sign in | Payroll Portal",
 };
 
 const CALLBACK_ERRORS: Record<string, string> = {
@@ -20,31 +19,39 @@ export default async function LoginPage({
   const { next, error } = await searchParams;
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-      <h1 className="text-xl font-bold text-slate-900">Sign in</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        Use the password you chose when registering, or have a sign-in link
-        emailed to you instead.
-      </p>
+    <div className="w-full max-w-md bg-white/95 backdrop-blur-sm border border-slate-200/80 rounded-3xl p-6 sm:p-10 shadow-xl shadow-slate-200/50 text-left transition-all">
+      {/* Header */}
+      <div className="text-center mb-6">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold tracking-wider uppercase rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 mb-3">
+          🔒 Secure Sign In
+        </span>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          Welcome Back
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          Sign in to access your payroll dashboard and records.
+        </p>
+      </div>
 
       {error && CALLBACK_ERRORS[error] && (
-        <p
+        <div
           role="alert"
-          className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          className="mb-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium leading-relaxed shadow-xs flex items-center gap-2"
         >
-          {CALLBACK_ERRORS[error]}
-        </p>
+          <span>⚠️</span>
+          <span>{CALLBACK_ERRORS[error]}</span>
+        </div>
       )}
 
       <LoginForm next={next} />
 
-      <p className="mt-6 border-t border-slate-100 pt-4 text-center text-xs text-slate-500">
+      <p className="mt-6 border-t border-slate-100 pt-5 text-center text-xs text-slate-500">
         Do not have an account yet?{" "}
         <Link
           href="/signup"
-          className="font-semibold text-indigo-600 hover:text-indigo-700"
+          className="font-bold text-indigo-600 hover:text-indigo-800 transition"
         >
-          Create one
+          Create account →
         </Link>
       </p>
     </div>

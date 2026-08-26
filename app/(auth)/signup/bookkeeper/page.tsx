@@ -27,9 +27,7 @@ export default function CompanySignupPage() {
 
   const supabase = createClient();
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -89,11 +87,10 @@ export default function CompanySignupPage() {
       }
 
       if (data?.user) {
-        // Direct navigation to the dashboard to create businesses
         window.location.href = "/dashboard";
         return;
       }
-    } catch (err: unknown) {
+    } catch {
       setGeneralError("An unexpected error occurred during company registration. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -102,25 +99,24 @@ export default function CompanySignupPage() {
 
   if (isSuccess) {
     return (
-      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl p-8 sm:p-10 shadow-sm text-center">
-        <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+      <div className="w-full max-w-lg bg-white/95 backdrop-blur-sm border border-slate-200/80 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-200/50 text-center">
+        <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-sm shadow-emerald-500/20">
           ✓
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">
+        <h2 className="text-2xl font-extrabold text-slate-900 mb-2">
           Company Account Created!
         </h2>
         <p className="text-slate-600 text-sm sm:text-base mb-6 leading-relaxed">
-          We have registered the company account for{" "}
-          <strong className="text-slate-800">{formData.firmName}</strong> (Tax ID:{" "}
-          {formData.taxId}).
+          We have registered the organization account for{" "}
+          <strong className="text-slate-800">{formData.firmName}</strong> (Tax ID: {formData.taxId}).
           <br className="my-2" />
           A verification link has been sent to{" "}
-          <span className="font-semibold text-slate-900">{formData.email}</span>. Once verified, you can log in, create businesses, and generate employee/manager invitation links.
+          <span className="font-semibold text-slate-900">{formData.email}</span>. Once verified, you can log in, add client businesses, and manage payroll.
         </p>
         <div className="flex justify-center">
           <Link
             href="/"
-            className="inline-flex justify-center items-center px-6 py-2.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition text-sm"
+            className="inline-flex justify-center items-center px-6 py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition shadow-sm text-sm"
           >
             Return to Home
           </Link>
@@ -130,40 +126,50 @@ export default function CompanySignupPage() {
   }
 
   return (
-    <div className="w-full max-w-xl bg-white border border-slate-200 rounded-2xl p-6 sm:p-10 shadow-sm text-left">
+    <div className="w-full max-w-2xl bg-white/95 backdrop-blur-sm border border-slate-200/80 rounded-3xl p-6 sm:p-10 shadow-xl shadow-slate-200/50 text-left transition-all">
       {/* Header */}
-      <div className="border-b border-slate-100 pb-4 mb-6">
-        <span className="inline-block px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700 mb-2">
-          Company Account
-        </span>
-        <h1 className="text-2xl font-extrabold text-slate-900">
+      <div className="border-b border-slate-100 pb-5 mb-6">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold tracking-wider uppercase rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+            🏢 Organization Registration
+          </span>
+          <Link
+            href="/signup"
+            className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
+          >
+            ← Change type
+          </Link>
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
           Register Company Account
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Set up your booking / bookkeeping company account to manage client businesses and employee payroll.
+          Set up your organization to manage businesses, bulk-upload payslips, and roster staff.
         </p>
       </div>
 
       {generalError && (
-        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-3">
-          <span className="text-lg">⚠️</span>
-          <div className="flex-1">{generalError}</div>
+        <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-3 shadow-xs">
+          <span className="text-lg shrink-0">⚠️</span>
+          <div className="flex-1 font-medium leading-relaxed">{generalError}</div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-        {/* Company Details Section */}
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+        {/* Section 1: Company Identity */}
         <div className="space-y-4">
-          <h2 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-1.5 flex items-center gap-1.5">
-            <span>🏢</span>
-            <span>Company Information</span>
-          </h2>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
+            <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px]">
+              1
+            </span>
+            <span>Organization Information</span>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label
                 htmlFor="firmName"
-                className="block text-xs font-semibold text-slate-700 mb-1"
+                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
               >
                 Company / Firm Name <span className="text-red-500">*</span>
               </label>
@@ -175,15 +181,16 @@ export default function CompanySignupPage() {
                 value={formData.firmName}
                 onChange={handleChange}
                 placeholder="e.g. Apex Booking & Payroll Ltd"
-                className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
                   fieldErrors.firmName
-                    ? "border-red-400 focus:ring-red-200"
-                    : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-                } focus:outline-none focus:ring-2 transition`}
+                    ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                    : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+                } focus:outline-none focus:ring-4 transition shadow-xs`}
               />
               {fieldErrors.firmName && (
-                <p className="text-xs text-red-600 mt-1">
-                  {fieldErrors.firmName}
+                <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                  <span>•</span>
+                  <span>{fieldErrors.firmName}</span>
                 </p>
               )}
             </div>
@@ -191,9 +198,9 @@ export default function CompanySignupPage() {
             <div>
               <label
                 htmlFor="taxId"
-                className="block text-xs font-semibold text-slate-700 mb-1"
+                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
               >
-                Company Tax ID / Business # <span className="text-red-500">*</span>
+                Tax ID / Business # (ח.פ) <span className="text-red-500">*</span>
               </label>
               <input
                 id="taxId"
@@ -203,30 +210,35 @@ export default function CompanySignupPage() {
                 value={formData.taxId}
                 onChange={handleChange}
                 placeholder="e.g. 514321987"
-                className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
                   fieldErrors.taxId
-                    ? "border-red-400 focus:ring-red-200"
-                    : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-                } focus:outline-none focus:ring-2 transition`}
+                    ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                    : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+                } focus:outline-none focus:ring-4 transition shadow-xs`}
               />
               {fieldErrors.taxId && (
-                <p className="text-xs text-red-600 mt-1">{fieldErrors.taxId}</p>
+                <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                  <span>•</span>
+                  <span>{fieldErrors.taxId}</span>
+                </p>
               )}
             </div>
           </div>
         </div>
 
-        {/* Account Administrator Section */}
-        <div className="space-y-4 pt-1">
-          <h2 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-1.5 flex items-center gap-1.5">
-            <span>👤</span>
-            <span>Account Administrator / Contact Person</span>
-          </h2>
+        {/* Section 2: Account Administrator */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
+            <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px]">
+              2
+            </span>
+            <span>Account Administrator</span>
+          </div>
 
           <div>
             <label
               htmlFor="fullName"
-              className="block text-xs font-semibold text-slate-700 mb-1"
+              className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
             >
               Administrator Full Name <span className="text-red-500">*</span>
             </label>
@@ -238,14 +250,17 @@ export default function CompanySignupPage() {
               value={formData.fullName}
               onChange={handleChange}
               placeholder="e.g. Jane Doe"
-              className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
+              className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
                 fieldErrors.fullName
-                  ? "border-red-400 focus:ring-red-200"
-                  : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-              } focus:outline-none focus:ring-2 transition`}
+                  ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                  : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+              } focus:outline-none focus:ring-4 transition shadow-xs`}
             />
             {fieldErrors.fullName && (
-              <p className="text-xs text-red-600 mt-1">{fieldErrors.fullName}</p>
+              <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                <span>•</span>
+                <span>{fieldErrors.fullName}</span>
+              </p>
             )}
           </div>
 
@@ -253,9 +268,9 @@ export default function CompanySignupPage() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-xs font-semibold text-slate-700 mb-1"
+                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
               >
-                Company Email Address <span className="text-red-500">*</span>
+                Work Email Address <span className="text-red-500">*</span>
               </label>
               <input
                 id="email"
@@ -265,23 +280,26 @@ export default function CompanySignupPage() {
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="admin@company.com"
-                className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
                   fieldErrors.email
-                    ? "border-red-400 focus:ring-red-200"
-                    : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-                } focus:outline-none focus:ring-2 transition`}
+                    ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                    : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+                } focus:outline-none focus:ring-4 transition shadow-xs`}
               />
               {fieldErrors.email && (
-                <p className="text-xs text-red-600 mt-1">{fieldErrors.email}</p>
+                <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                  <span>•</span>
+                  <span>{fieldErrors.email}</span>
+                </p>
               )}
             </div>
 
             <div>
               <label
                 htmlFor="phone"
-                className="block text-xs font-semibold text-slate-700 mb-1"
+                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
               >
-                Phone Number (Optional)
+                Phone Number <span className="text-slate-400 font-normal">(Optional)</span>
               </label>
               <input
                 id="phone"
@@ -290,23 +308,36 @@ export default function CompanySignupPage() {
                 value={formData.phone}
                 onChange={handleChange}
                 placeholder="050-1234567"
-                className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
                   fieldErrors.phone
-                    ? "border-red-400 focus:ring-red-200"
-                    : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-                } focus:outline-none focus:ring-2 transition`}
+                    ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                    : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+                } focus:outline-none focus:ring-4 transition shadow-xs`}
               />
               {fieldErrors.phone && (
-                <p className="text-xs text-red-600 mt-1">{fieldErrors.phone}</p>
+                <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                  <span>•</span>
+                  <span>{fieldErrors.phone}</span>
+                </p>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Section 3: Security */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
+            <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px]">
+              3
+            </span>
+            <span>Security &amp; Password</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label
                 htmlFor="password"
-                className="block text-xs font-semibold text-slate-700 mb-1"
+                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
               >
                 Password <span className="text-red-500">*</span>
               </label>
@@ -318,15 +349,16 @@ export default function CompanySignupPage() {
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="At least 6 characters"
-                className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
                   fieldErrors.password
-                    ? "border-red-400 focus:ring-red-200"
-                    : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-                } focus:outline-none focus:ring-2 transition`}
+                    ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                    : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+                } focus:outline-none focus:ring-4 transition shadow-xs`}
               />
               {fieldErrors.password && (
-                <p className="text-xs text-red-600 mt-1">
-                  {fieldErrors.password}
+                <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                  <span>•</span>
+                  <span>{fieldErrors.password}</span>
                 </p>
               )}
             </div>
@@ -334,7 +366,7 @@ export default function CompanySignupPage() {
             <div>
               <label
                 htmlFor="confirmPassword"
-                className="block text-xs font-semibold text-slate-700 mb-1"
+                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
               >
                 Confirm Password <span className="text-red-500">*</span>
               </label>
@@ -346,15 +378,16 @@ export default function CompanySignupPage() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 placeholder="Re-enter password"
-                className={`w-full px-3.5 py-2 text-sm rounded-lg border ${
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${
                   fieldErrors.confirmPassword
-                    ? "border-red-400 focus:ring-red-200"
-                    : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100"
-                } focus:outline-none focus:ring-2 transition`}
+                    ? "border-red-400 bg-red-50/20 focus:ring-red-100"
+                    : "border-slate-300 bg-white focus:border-indigo-600 focus:ring-indigo-100"
+                } focus:outline-none focus:ring-4 transition shadow-xs`}
               />
               {fieldErrors.confirmPassword && (
-                <p className="text-xs text-red-600 mt-1">
-                  {fieldErrors.confirmPassword}
+                <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+                  <span>•</span>
+                  <span>{fieldErrors.confirmPassword}</span>
                 </p>
               )}
             </div>
@@ -362,21 +395,32 @@ export default function CompanySignupPage() {
         </div>
 
         {/* Terms */}
-        <div className="pt-2">
-          <label className="flex items-start gap-2 cursor-pointer">
+        <div className="pt-1">
+          <label className="flex items-start gap-2.5 cursor-pointer select-none">
             <input
               type="checkbox"
               name="terms"
               checked={formData.terms}
               onChange={handleChange}
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              className="mt-0.5 h-4 w-4 rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500"
             />
-            <span className="text-xs text-slate-600 leading-tight">
-              I agree to the <span className="text-indigo-600 underline">Terms of Service</span> and <span className="text-indigo-600 underline">Privacy Policy</span>.
+            <span className="text-xs text-slate-600 leading-relaxed">
+              I agree to the{" "}
+              <span className="text-indigo-600 font-semibold underline cursor-pointer hover:text-indigo-800">
+                Terms of Service
+              </span>{" "}
+              and{" "}
+              <span className="text-indigo-600 font-semibold underline cursor-pointer hover:text-indigo-800">
+                Privacy Policy
+              </span>
+              .
             </span>
           </label>
           {fieldErrors.terms && (
-            <p className="text-xs text-red-600 mt-1">{fieldErrors.terms}</p>
+            <p className="text-xs font-medium text-red-600 mt-1.5 flex items-center gap-1">
+              <span>•</span>
+              <span>{fieldErrors.terms}</span>
+            </p>
           )}
         </div>
 
@@ -385,15 +429,32 @@ export default function CompanySignupPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold rounded-xl shadow-sm hover:shadow transition flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed text-sm"
+            className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold rounded-xl shadow-md shadow-indigo-600/20 hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed text-sm"
           >
             {isSubmitting ? (
-              <span>Registering Company Account...</span>
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Registering Organization Account...</span>
+              </>
             ) : (
-              <span>Create Company Account</span>
+              <>
+                <span>Create Company Account</span>
+                <span className="font-normal text-indigo-200">→</span>
+              </>
             )}
           </button>
         </div>
+
+        {/* Footer Link */}
+        <p className="border-t border-slate-100 pt-5 text-center text-xs text-slate-500">
+          Already have an account?{" "}
+          <Link
+            href="/login"
+            className="font-bold text-indigo-600 hover:text-indigo-800 transition"
+          >
+            Sign in here →
+          </Link>
+        </p>
       </form>
     </div>
   );
