@@ -40,37 +40,47 @@ export function homeFor(ctx: AuthContext): string {
 }
 
 export const getContext = cache(async (): Promise<AuthContext | null> => {
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-  // A real session always wins. DEV_AUTH_ROLE is only a stand-in for when
-  // nobody is signed in, so logging in as an employee is not overwritten by
-  // a leftover bookkeeper impersonation.
-  if (!user) {
+    // A real session always wins. DEV_AUTH_ROLE is only a stand-in for when
+    // nobody is signed in, so logging in as an employee is not overwritten by
+    // a leftover bookkeeper impersonation.
+    if (userError || !user) {
+      if (userError) {
+        console.warn("Supabase auth user check notice:", userError.message);
+      }
+      const devRole = devAuthRole();
+      return devRole ? devContext(devRole) : null;
+    }
+
+    const [profile, memberships, firm] = await Promise.all([
+      loadProfile(supabase, user.id),
+      loadMemberships(supabase, user.id),
+      loadFirm(supabase, user.id),
+    ]);
+
+    return {
+      userId: user.id,
+      email: user.email ?? profile?.email ?? "",
+      profile,
+      memberships,
+      membership:
+        memberships.find((row) => row.role !== "bookkeeper") ??
+        memberships[0] ??
+        null,
+      firm,
+    };
+  } catch (err: any) {
+    console.warn("Auth context resolution caught error (e.g. clock skew / PGRST303):", err?.message || err);
     const devRole = devAuthRole();
     return devRole ? devContext(devRole) : null;
   }
-
-  const [profile, memberships, firm] = await Promise.all([
-    loadProfile(supabase, user.id),
-    loadMemberships(supabase, user.id),
-    loadFirm(supabase, user.id),
-  ]);
-
-  return {
-    userId: user.id,
-    email: user.email ?? profile?.email ?? "",
-    profile,
-    memberships,
-    membership:
-      memberships.find((row) => row.role !== "bookkeeper") ??
-      memberships[0] ??
-      null,
-    firm,
-  };
 });
 
 export async function requireContext(): Promise<AuthContext> {
@@ -144,6 +154,10 @@ async function loadProfile(
 
   if (error) {
     if (error.code === UNDEFINED_TABLE) return null;
+    if (error.code === "PGRST303" || error.message?.includes("JWT")) {
+      console.warn("PostgREST JWT error in loadProfile:", error.message);
+      return null;
+    }
     throw error;
   }
   if (!data) return null;
@@ -171,6 +185,10 @@ async function loadFirm(
 
   if (error) {
     if (error.code === UNDEFINED_TABLE) return null;
+    if (error.code === "PGRST303" || error.message?.includes("JWT")) {
+      console.warn("PostgREST JWT error in loadFirm:", error.message);
+      return null;
+    }
     throw error;
   }
   if (!data) return null;
@@ -195,6 +213,10 @@ async function loadMemberships(
 
   if (error) {
     if (error.code === UNDEFINED_TABLE) return [];
+    if (error.code === "PGRST303" || error.message?.includes("JWT")) {
+      console.warn("PostgREST JWT error in loadMemberships:", error.message);
+      return [];
+    }
     throw error;
   }
 

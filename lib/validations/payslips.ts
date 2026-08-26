@@ -4,18 +4,18 @@ export const MAX_PAYSLIP_BYTES = 10_485_760;
 export const MAX_PAYSLIP_BATCH = 30;
 
 export const MONTHS = [
-  { value: 1, label: "January" },
-  { value: 2, label: "February" },
-  { value: 3, label: "March" },
-  { value: 4, label: "April" },
-  { value: 5, label: "May" },
-  { value: 6, label: "June" },
-  { value: 7, label: "July" },
-  { value: 8, label: "August" },
-  { value: 9, label: "September" },
-  { value: 10, label: "October" },
-  { value: 11, label: "November" },
-  { value: 12, label: "December" },
+  { value: 1, label: "January (1)" },
+  { value: 2, label: "February (2)" },
+  { value: 3, label: "March (3)" },
+  { value: 4, label: "April (4)" },
+  { value: 5, label: "May (5)" },
+  { value: 6, label: "June (6)" },
+  { value: 7, label: "July (7)" },
+  { value: 8, label: "August (8)" },
+  { value: 9, label: "September (9)" },
+  { value: 10, label: "October (10)" },
+  { value: 11, label: "November (11)" },
+  { value: 12, label: "December (12)" },
 ] as const;
 
 export function monthLabel(month: number): string {

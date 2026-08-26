@@ -486,7 +486,6 @@ function DraftCard({
           <p className="text-sm font-semibold text-slate-900 truncate">{draft.file.name}</p>
           <p className="text-xs text-slate-500">
             {(draft.file.size / 1024).toFixed(1)} KB
-            {draft.extractedName ? ` · Name on slip: ${draft.extractedName}` : ""}
             {draft.extractedId ? ` · ID ${draft.extractedId}` : ""}
           </p>
         </div>

@@ -464,7 +464,7 @@ export function extractPeriod(
 
 const VACATION_PAY = /דמי\s*חופשה|פדיון\s*חופשה|פדיון/;
 const SICK_PAY = /דמי\s*מחלה/;
-const LEAVE_NOISE = /צבירת?|ניצול|דמי|פדיון|הבראה|מילואים|opening|accrual/;
+const LEAVE_NOISE = /צבירת?|ניצול|דמי|פדיון|הבראה|מילואים|שעות|תועש|\bhours?\b|opening|accrual/;
 
 export type PdfTextItem = {
   text: string;
@@ -475,16 +475,18 @@ export type PdfTextItem = {
 
 function hasVacationLabel(text: string): boolean {
   if (VACATION_PAY.test(text)) return false;
+  if (/שעות|תועש|\bhours?\b/i.test(text)) return false;
   return /חופש|vacation|annual\s*leave|השפוח|שפוח/.test(text);
 }
 
 function hasSickLabel(text: string): boolean {
   if (SICK_PAY.test(text)) return false;
+  if (/שעות|תועש|\bhours?\b/i.test(text)) return false;
   return /מחלה|sick\s*(?:days?|leave)|\bsick\b|הלחמ/.test(text);
 }
 
 function isLeaveMovementRow(text: string): boolean {
-  return /פתיחה|קודמת|ניצול|צבירה|נוצל|נצבר|opening|accrual/.test(text);
+  return /פתיחה|קודמת|ניצול|צבירה|נוצל|נצבר|הריבצ|לצונ|המדוק|opening|accrual/.test(text);
 }
 
 function isClosingBalanceHeader(text: string): boolean {
@@ -493,7 +495,7 @@ function isClosingBalanceHeader(text: string): boolean {
   if (hasVacationLabel(t) || hasSickLabel(t)) return false;
   return t
     .split(/\s+/)
-    .some((token) => /^(יתרה|יתרת|remaining|balance|הרתי)$/i.test(token));
+    .some((token) => /^(יתרה|יתרת|ליתרה|remaining|balance|הרתי|הרתיל|יתרת\s*סגירה)$/i.test(token));
 }
 
 function isTypeRowLabel(text: string, kind: "vacation" | "sick"): boolean {
@@ -504,14 +506,27 @@ function isTypeRowLabel(text: string, kind: "vacation" | "sick"): boolean {
   return hasSickLabel(text) && !hasVacationLabel(text);
 }
 
-/** Day counts only — do not reuse salary parseAmount, which reverses some decimals. */
+/** Day counts only — supports zero, negative balances, and 1-3 decimals. */
 function parseLeaveDays(raw: string): number | null {
-  const trimmed = raw.trim();
+  if (raw === undefined || raw === null) return null;
+  const trimmed = String(raw).trim().replace(/[₪ILS]/gi, "");
+  if (!trimmed) return null;
   if (/^\d{1,3},\d{3}/.test(trimmed)) return null;
-  const clean = trimmed.replace(/,/g, ".");
-  if (!/^\d{1,3}(\.\d{1,2})?$/.test(clean)) return null;
-  const value = Number(clean);
-  if (!Number.isFinite(value) || value < 0 || value > 180) return null;
+
+  let clean = trimmed;
+  let isNegative = false;
+  if (clean.endsWith("-")) {
+    isNegative = true;
+    clean = clean.slice(0, -1);
+  } else if (clean.startsWith("-")) {
+    isNegative = true;
+    clean = clean.slice(1);
+  }
+
+  clean = clean.replace(/,/g, ".");
+  if (!/^\d{1,3}(\.\d{1,3})?$/.test(clean)) return null;
+  const value = Number(clean) * (isNegative ? -1 : 1);
+  if (!Number.isFinite(value) || value < -100 || value > 365) return null;
   if (isProbableYear(value)) return null;
   return Math.round(value * 100) / 100;
 }
@@ -544,7 +559,17 @@ function mergeRowWords(row: PdfTextItem[]): PdfTextItem[] {
   return merged;
 }
 
-function clusterRows(items: PdfTextItem[], yTol = 8): PdfTextItem[][] {
+function isRowHours(row: PdfTextItem[]): boolean {
+  const rowText = row.map((item) => normalizeTextLine(item.text)).join(" ");
+  return /שעות|תועש|\bhours?\b/i.test(rowText);
+}
+
+function isRowDays(row: PdfTextItem[]): boolean {
+  const rowText = row.map((item) => normalizeTextLine(item.text)).join(" ");
+  return /ימים|םימי|\bdays?\b/i.test(rowText);
+}
+
+function clusterRows(items: PdfTextItem[], yTol = 4): PdfTextItem[][] {
   const sorted = [...items].sort((a, b) => b.y - a.y || a.x - b.x);
   const rows: PdfTextItem[][] = [];
   for (const item of sorted) {
@@ -561,6 +586,7 @@ function collectLabels(
 ): PdfTextItem[] {
   const found: PdfTextItem[] = [];
   for (const row of rows) {
+    if (isRowHours(row)) continue;
     for (const cell of row) {
       const text = normalizeTextLine(cell.text);
       if (!isTypeRowLabel(text, kind)) continue;
@@ -589,6 +615,7 @@ function closestPair(
 function numberCells(rows: PdfTextItem[][]): PdfTextItem[] {
   const cells: PdfTextItem[] = [];
   for (const row of rows) {
+    if (isRowHours(row)) continue;
     for (const cell of row) {
       const text = normalizeTextLine(cell.text);
       if (hasVacationLabel(text) || hasSickLabel(text) || LEAVE_NOISE.test(text)) {
@@ -793,6 +820,12 @@ function coalesceHeaderTokens(tokens: string[]): string[] {
     if (/^יתרת?$/.test(current) && next && /^(פתיחה|קודמת|חדשה|סגירה)$/.test(next)) {
       grouped.push(`${current} ${next}`);
       i += 1;
+    } else if (/^(המדוק|החיתפ|הריגס|השדח)$/.test(current) && next && /^הרתי$/.test(next)) {
+      grouped.push(`${current} ${next}`);
+      i += 1;
+    } else if (/^הרתי$/.test(current) && next && /^(המדוק|החיתפ|הריגס|השדח)$/.test(next)) {
+      grouped.push(`${current} ${next}`);
+      i += 1;
     } else {
       grouped.push(current);
     }
@@ -836,6 +869,7 @@ function extractLeaveTableFromLines(
     let sickDays: number | null = null;
     for (let j = i + 1; j <= i + 10 && j < normalized.length; j++) {
       const row = normalized[j];
+      if (/שעות|תועש|\bhours?\b/i.test(row)) continue;
       const tokens = coalesceHeaderTokens(row.split(/\s+/).filter(Boolean));
       if (tokens.length === 0) continue;
       const vacation = isTypeRowLabel(row, "vacation");
@@ -854,6 +888,7 @@ function extractLeaveTableFromLines(
   let vacationDays: number | null = null;
   let sickDays: number | null = null;
   for (const line of normalized) {
+    if (/שעות|תועש|\bhours?\b/i.test(line)) continue;
     const vacation = isTypeRowLabel(line, "vacation");
     const sick = isTypeRowLabel(line, "sick");
     if (vacation === sick) continue;
@@ -866,22 +901,304 @@ function extractLeaveTableFromLines(
   return { vacationDays, sickDays };
 }
 
+function extractLeaveBalancesFromTextPatterns(
+  _text: string,
+  lines: string[],
+): { vacationDays: number | null; sickDays: number | null } {
+  let vacationDays: number | null = null;
+  let sickDays: number | null = null;
+
+  const vacationPatterns = [
+    /(?:יתר(?:ת|ה)\s*חופש(?:ה)?|יתרת\s*ימי\s*חופש(?:ה)?|צבירת\s*חופש(?:ה)?\s*יתרה|vacation\s*(?:balance|remaining|days?))\s*[:.\-]?\s*(-?[0-9]+(?:\.[0-9]{1,3})?-?)/i,
+    /(?:-?[0-9]+(?:\.[0-9]{1,3})?-?)\s*[:.\-]?\s*(?:יתר(?:ת|ה)\s*חופש(?:ה)?|השפוח\s*תרתי|שפוח\s*תרתי|השפוח\s*הרתי|שפוח\s*הרתי)/i,
+    /(?:השפוח\s*תרתי|שפוח\s*תרתי|השפוח\s*הרתי|שפוח\s*הרתי|השפוח\s*הרתיל|שפוח\s*הרתיל)\s*[:.\-]?\s*(-?[0-9]+(?:\.[0-9]{1,3})?-?)/i,
+    /(?:חופש(?:ה)?|שפוח|השפוח)\s*[:.\-]?\s*(-?[0-9]+(?:\.[0-9]{1,3})?-?)\s*(?:ימים|days|הרתי|תרתי)?/i,
+  ];
+
+  const sickPatterns = [
+    /(?:יתר(?:ת|ה)\s*מחלה|יתרת\s*ימי\s*מחלה|צבירת\s*מחלה\s*יתרה|sick\s*(?:balance|remaining|days?))\s*[:.\-]?\s*(-?[0-9]+(?:\.[0-9]{1,3})?-?)/i,
+    /(?:-?[0-9]+(?:\.[0-9]{1,3})?-?)\s*[:.\-]?\s*(?:יתר(?:ת|ה)\s*מחלה|הלחמ\s*תרתי|הלחמ\s*הרתי|הלחמ\s*הרתיל)/i,
+    /(?:הלחמ\s*תרתי|הלחמ\s*הרתי|הלחמ\s*הרתיל)\s*[:.\-]?\s*(-?[0-9]+(?:\.[0-9]{1,3})?-?)/i,
+    /(?:מחלה|הלחמ)\s*[:.\-]?\s*(-?[0-9]+(?:\.[0-9]{1,3})?-?)\s*(?:ימים|days|הרתי|תרתי)?/i,
+  ];
+
+  for (const line of lines) {
+    const norm = normalizeTextLine(line);
+    if (vacationDays === null) {
+      for (const p of vacationPatterns) {
+        const m = norm.match(p);
+        if (m && m[1]) {
+          const val = parseLeaveDays(m[1]);
+          if (val !== null) {
+            vacationDays = val;
+            break;
+          }
+        }
+      }
+    }
+    if (sickDays === null) {
+      for (const p of sickPatterns) {
+        const m = norm.match(p);
+        if (m && m[1]) {
+          const val = parseLeaveDays(m[1]);
+          if (val !== null) {
+            sickDays = val;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return { vacationDays, sickDays };
+}
+
+function solveRowBalance(lineNumbers: number[]): number | null {
+  const nums = lineNumbers.filter((n) => n >= 0 && n <= 300);
+  if (!nums.includes(0)) nums.push(0);
+
+  // Look for Prev + Accrued - Used = Balance where accrued is a daily accrual (<= 3.5)
+  const candidates: Array<{ prev: number; accrued: number; used: number; balance: number }> = [];
+  for (const prev of nums) {
+    if (prev <= 0) continue;
+    for (const accrued of nums) {
+      if (accrued <= 0 || accrued > 3.5) continue; // standard day accrual is <= 3.5 days/month
+      for (const used of nums) {
+        if (used === prev) continue;
+        for (const balance of nums) {
+          if (balance === accrued && prev > 0) continue;
+          if (prev === balance && used !== 0) continue;
+          if (balance > 80) continue; // standard day balance is <= 80 days
+          if (Math.abs((prev + accrued - used) - balance) < 0.02) {
+            candidates.push({ prev, accrued, used, balance });
+          }
+        }
+      }
+    }
+  }
+
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => b.balance - a.balance);
+    return candidates[0].balance;
+  }
+
+  // Fallback: if numbers are [18.76, 0.00, 1.04, 17.72] or [17.72, 1.04, 0.00, 18.76]
+  const validDayBalances = lineNumbers.filter((n) => n > 3.5 && n <= 80);
+  if (validDayBalances.length > 0) {
+    return validDayBalances[0];
+  }
+  return null;
+}
+
+function extractLeaveFromRowLines(
+  lines: string[],
+): { vacationDays: number | null; sickDays: number | null } {
+  let vacationDays: number | null = null;
+  let sickDays: number | null = null;
+
+  for (const line of lines) {
+    if (/שעות|תועש|\bhours?\b/i.test(line)) continue;
+    const nums = (line.match(/\b\d{1,3}(?:\.\d{1,2})?\b/g) || []).map(Number);
+    if (nums.length === 0) continue;
+
+    const isVac =
+      /(?:^|\s)(?:חופש|חופשה|שפוח|השפוח)(?:\s|$|:)/i.test(line) &&
+      !/(?:^|\s)(?:מחלה|הלחמ)(?:\s|$|:)/i.test(line) &&
+      !/צבירת|דמי|פדיון|הריבצ/i.test(line);
+
+    const isSick =
+      /(?:^|\s)(?:מחלה|הלחמ)(?:\s|$|:)/i.test(line) &&
+      !/(?:^|\s)(?:חופש|חופשה|שפוח|השפוח)(?:\s|$|:)/i.test(line) &&
+      !/צבירת|דמי|פדיון|הריבצ/i.test(line);
+
+    if (isVac && vacationDays === null) {
+      vacationDays = solveRowBalance(nums);
+    }
+    if (isSick && sickDays === null) {
+      sickDays = solveRowBalance(nums);
+    }
+  }
+
+  return { vacationDays, sickDays };
+}
+
+function extractLeaveSectionText(text: string): string {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const leaveLines: string[] = [];
+  let capturing = false;
+  let linesSinceLeave = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const hasLeaveWord =
+      /חופש|חופשה|שפוח|השפוח|מחלה|הלחמ|הרתיל|ליתרה|ניהול\s*היעדרויות|צבירת/i.test(line);
+    if (hasLeaveWord) {
+      capturing = true;
+      linesSinceLeave = 0;
+      if (i > 0 && !leaveLines.includes(lines[i - 1])) {
+        leaveLines.push(lines[i - 1]);
+      }
+      leaveLines.push(line);
+    } else if (capturing) {
+      linesSinceLeave++;
+      if (linesSinceLeave <= 4) {
+        leaveLines.push(line);
+      } else {
+        capturing = false;
+      }
+    }
+  }
+
+  return leaveLines.length > 0 ? leaveLines.join("\n") : text;
+}
+
+/**
+ * Solves the Israeli leave balance equation:
+ * Previous Leave - Used Leave + Accrued Leave = Balance
+ * Handles detached-column PDFs where table text and numbers are emitted separately.
+ */
+function solveIsraeliLeaveEquations(text: string): { vacationDays: number | null; sickDays: number | null } {
+  const matches = text.match(/\b\d{1,3}(?:\.\d{1,3})?\b/g) || [];
+  const numbers = matches
+    .map(Number)
+    .filter((n) => !isNaN(n) && n >= 0 && n <= 300 && !isProbableYear(n));
+
+  const unique = Array.from(new Set(numbers));
+  if (!unique.includes(0)) unique.push(0);
+
+  const equations: Array<{ prev: number; used: number; accrued: number; balance: number; score: number; kind: "vacation" | "sick" | null }> = [];
+
+  for (const prev of unique) {
+    if (prev < 0) continue;
+    for (const accrued of unique) {
+      if (accrued <= 0 || accrued > 3.5) continue; // Monthly accrual in days is 0.3 to 3.5
+      for (const used of unique) {
+        if (used === prev && prev > 0 && accrued > 0 && !unique.includes(0)) continue;
+        for (const balance of unique) {
+          if (balance < 0 || balance > 80) continue; // Days balance is <= 80
+          if (balance === accrued && prev > 0 && used === 0) continue;
+          if (prev === balance && used !== 0) continue;
+          if (Math.abs((prev + accrued - used) - balance) < 0.02) {
+            let score = 10;
+            const hasDecimals = (balance % 1 !== 0) || (prev % 1 !== 0) || (accrued % 1 !== 0);
+            if (hasDecimals) score += 100;
+            if (balance >= 5.0 && balance <= 60.0) score += 50;
+
+            const bStr = balance.toFixed(2).replace(".", "\\.");
+            const pStr = prev.toFixed(2).replace(".", "\\.");
+            const vacRegex = new RegExp(`(?:חופש|שפוח|חופשה|השפוח)[^\\n]{0,100}\\b(${bStr}|${pStr})\\b|\\b(${bStr}|${pStr})\\b[^\\n]{0,100}(?:חופש|שפוח|חופשה|השפוח)`, "i");
+            const sickRegex = new RegExp(`(?:מחלה|הלחמ)[^\\n]{0,100}\\b(${bStr}|${pStr})\\b|\\b(${bStr}|${pStr})\\b[^\\n]{0,100}(?:מחלה|הלחמ)`, "i");
+
+            let kind: "vacation" | "sick" | null = null;
+            if (vacRegex.test(text)) {
+              score += 200;
+              kind = "vacation";
+            } else if (sickRegex.test(text)) {
+              score += 200;
+              kind = "sick";
+            }
+
+            equations.push({ prev, used, accrued, balance, score, kind });
+          }
+        }
+      }
+    }
+  }
+
+  if (equations.length === 0) return { vacationDays: null, sickDays: null };
+
+  equations.sort((a, b) => b.score - a.score || b.balance - a.balance);
+
+  let vacationDays = equations.find((e) => e.kind === "vacation")?.balance ?? null;
+  let sickDays = equations.find((e) => e.kind === "sick")?.balance ?? null;
+
+  if (vacationDays === null || sickDays === null) {
+    const distinct: number[] = [];
+    const seen = new Set<number>();
+    for (const eq of equations) {
+      if (!seen.has(eq.balance)) {
+        distinct.push(eq.balance);
+        seen.add(eq.balance);
+      }
+    }
+    if (vacationDays === null && distinct.length > 0) vacationDays = distinct[0];
+    if (sickDays === null && distinct.length > 1) sickDays = distinct[1];
+  }
+
+  return { vacationDays, sickDays };
+}
+
 /**
  * Remaining vacation = row חופש × column יתרה.
  * Remaining sick = row מחלה × the same יתרה column.
  */
 export function extractLeaveBalances(
-  _text: string,
+  text: string,
   lines: string[],
   items?: PdfTextItem[],
 ): { vacationDays: number | null; sickDays: number | null } {
-  if (items && items.length > 0) {
+  let vacationDays: number | null = null;
+  let sickDays: number | null = null;
+
+  // 1. Direct row lines with per-row Israeli equation solver (Highest Accuracy)
+  const fromRow = extractLeaveFromRowLines(lines);
+  if (fromRow.vacationDays !== null && fromRow.vacationDays <= 80) {
+    vacationDays = fromRow.vacationDays;
+  }
+  if (fromRow.sickDays !== null && fromRow.sickDays <= 80) {
+    sickDays = fromRow.sickDays;
+  }
+
+  // 2. Spatial 2D grid
+  if ((vacationDays === null || sickDays === null) && items && items.length > 0) {
     const fromGrid = extractLeaveBalancesFromGrid(items);
-    if (fromGrid.vacationDays !== null || fromGrid.sickDays !== null) {
-      return fromGrid;
+    if ((vacationDays === null || vacationDays > 80) && fromGrid.vacationDays !== null && fromGrid.vacationDays <= 80) {
+      vacationDays = fromGrid.vacationDays;
+    }
+    if ((sickDays === null || sickDays > 80) && fromGrid.sickDays !== null && fromGrid.sickDays <= 80) {
+      sickDays = fromGrid.sickDays;
     }
   }
-  return extractLeaveTableFromLines(lines);
+
+  // 3. Table line alignment
+  if (vacationDays === null || sickDays === null) {
+    const fromTable = extractLeaveTableFromLines(lines);
+    if ((vacationDays === null || vacationDays > 80) && fromTable.vacationDays !== null && fromTable.vacationDays <= 80) {
+      vacationDays = fromTable.vacationDays;
+    }
+    if ((sickDays === null || sickDays > 80) && fromTable.sickDays !== null && fromTable.sickDays <= 80) {
+      sickDays = fromTable.sickDays;
+    }
+  }
+
+  // 4. Textual regex patterns
+  if (vacationDays === null || sickDays === null) {
+    const fromPatterns = extractLeaveBalancesFromTextPatterns(text, lines);
+    if ((vacationDays === null || vacationDays > 80) && fromPatterns.vacationDays !== null && fromPatterns.vacationDays <= 80) {
+      vacationDays = fromPatterns.vacationDays;
+    }
+    if ((sickDays === null || sickDays > 80) && fromPatterns.sickDays !== null && fromPatterns.sickDays <= 80) {
+      sickDays = fromPatterns.sickDays;
+    }
+  }
+
+  // 5. Mathematical Leave Equation Solver (Scoped to Leave Section)
+  if (
+    vacationDays === null ||
+    sickDays === null ||
+    (vacationDays !== null && vacationDays > 80) ||
+    (sickDays !== null && sickDays > 80)
+  ) {
+    const fromEquations = solveIsraeliLeaveEquations(text);
+    if ((vacationDays === null || vacationDays > 80) && fromEquations.vacationDays !== null) {
+      vacationDays = fromEquations.vacationDays;
+    }
+    if ((sickDays === null || sickDays > 80) && fromEquations.sickDays !== null) {
+      sickDays = fromEquations.sickDays;
+    }
+  }
+
+  return { vacationDays, sickDays };
 }
 
 /**
