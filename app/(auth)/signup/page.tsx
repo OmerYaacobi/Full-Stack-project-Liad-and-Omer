@@ -2,11 +2,11 @@ import Link from "next/link";
 
 export default function SignupHubPage() {
   return (
-    <div className="w-full max-w-2xl bg-white/95 backdrop-blur-sm border border-slate-200/80 rounded-3xl p-6 sm:p-10 shadow-xl shadow-slate-200/50 text-left transition-all">
+    <div className="w-full max-w-xl bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-10 shadow-xl shadow-slate-200/50 text-left transition-all">
       {/* Header */}
       <div className="text-center mb-8">
-        <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold tracking-wider uppercase rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 mb-3">
-          Get Started
+        <span className="inline-flex items-center px-4 py-1 text-[11px] font-bold tracking-wider uppercase rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100/80 mb-3">
+          GET STARTED
         </span>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
           Join the Payroll Portal
@@ -18,20 +18,18 @@ export default function SignupHubPage() {
 
       <div className="space-y-4">
         {/* Company Registration Card */}
-        <div className="group relative p-6 sm:p-7 border-2 border-indigo-600/90 bg-gradient-to-br from-indigo-50/70 via-white to-indigo-50/30 rounded-2xl shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-start justify-between gap-4 mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-2xl shadow-sm shadow-indigo-600/30">
-                🏢
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                  Company / Bookkeeper Account
-                </h2>
-                <p className="text-xs font-semibold text-indigo-700">
-                  For Booking Firms &amp; Business Administrators
-                </p>
-              </div>
+        <div className="border-2 border-indigo-600 bg-white rounded-2xl p-6 sm:p-7 shadow-xs">
+          <div className="flex items-center gap-3.5 mb-4">
+            <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-2xl shrink-0 shadow-sm shadow-indigo-600/30">
+              🏢
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 leading-tight">
+                Company / Bookkeeper Account
+              </h2>
+              <p className="text-xs font-semibold text-indigo-600 mt-0.5">
+                For Booking Firms &amp; Business Administrators
+              </p>
             </div>
           </div>
 
@@ -39,31 +37,30 @@ export default function SignupHubPage() {
             Create an organization account to manage multiple businesses, upload and batch-process digital payslips, generate secure invites for workers, and publish payroll periods.
           </p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5 text-[11px] font-semibold text-slate-600">
-            <div className="flex items-center gap-1.5 bg-white/80 border border-slate-200/70 rounded-lg px-2.5 py-1.5">
-              <span className="text-emerald-600">✓</span> Multi-Business
+          <div className="flex flex-wrap sm:flex-nowrap gap-2 sm:gap-2.5 mb-6 text-xs font-medium text-slate-700">
+            <div className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 border border-slate-200 bg-white rounded-xl px-3 py-2 shadow-2xs">
+              <span className="text-emerald-500 font-bold text-sm">✓</span> Multi-Business
             </div>
-            <div className="flex items-center gap-1.5 bg-white/80 border border-slate-200/70 rounded-lg px-2.5 py-1.5">
-              <span className="text-emerald-600">✓</span> Smart PDF Parser
+            <div className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 border border-slate-200 bg-white rounded-xl px-3 py-2 shadow-2xs">
+              <span className="text-emerald-500 font-bold text-sm">✓</span> Smart PDF Parser
             </div>
-            <div className="flex items-center gap-1.5 bg-white/80 border border-slate-200/70 rounded-lg px-2.5 py-1.5">
-              <span className="text-emerald-600">✓</span> Staff Roster &amp; Invites
+            <div className="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 border border-slate-200 bg-white rounded-xl px-3 py-2 shadow-2xs">
+              <span className="text-emerald-500 font-bold text-sm">✓</span> Staff Roster &amp; Invites
             </div>
           </div>
 
           <Link
             href="/signup/bookkeeper"
-            className="inline-flex items-center justify-center w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-sm hover:shadow shadow-indigo-600/20 gap-2 cursor-pointer"
+            className="flex items-center justify-center w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition-all shadow-xs gap-2 cursor-pointer"
           >
-            <span>Register Organization Account</span>
-            <span className="font-normal text-indigo-200">→</span>
+            Register Organization Account →
           </Link>
         </div>
 
         {/* Worker & Manager Notice Card */}
-        <div className="p-5 sm:p-6 border border-slate-200 bg-slate-50/70 hover:bg-slate-50 rounded-2xl transition">
+        <div className="border border-slate-200/80 bg-slate-50/50 rounded-2xl p-5 sm:p-6">
           <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-slate-200/80 text-slate-700 flex items-center justify-center text-xl shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200/60 text-slate-600 flex items-center justify-center text-lg shrink-0">
               ✉️
             </div>
             <div className="flex-1 min-w-0">
@@ -75,7 +72,7 @@ export default function SignupHubPage() {
               </p>
               <Link
                 href="/signup/worker"
-                className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition underline underline-offset-2"
+                className="inline-flex items-center text-xs font-semibold text-indigo-600 hover:text-indigo-700 underline underline-offset-2 transition"
               >
                 Have an invitation code or URL? Enter it here →
               </Link>
@@ -83,17 +80,6 @@ export default function SignupHubPage() {
           </div>
         </div>
       </div>
-
-      {/* Footer Sign-in Link */}
-      <p className="mt-8 pt-6 border-t border-slate-100 text-center text-xs text-slate-500">
-        Already have an account?{" "}
-        <Link
-          href="/login"
-          className="font-bold text-indigo-600 hover:text-indigo-800 transition"
-        >
-          Sign in here →
-        </Link>
-      </p>
     </div>
   );
 }

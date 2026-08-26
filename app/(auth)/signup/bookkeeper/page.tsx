@@ -146,6 +146,17 @@ export default function CompanySignupPage() {
         <p className="text-xs sm:text-sm text-slate-500 mt-1">
           Set up your organization to manage businesses, bulk-upload payslips, and roster staff.
         </p>
+        <div className="flex flex-wrap sm:flex-nowrap gap-2 sm:gap-2.5 mt-4 text-xs font-medium text-slate-700">
+          <div className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 border border-slate-200 bg-slate-50/70 rounded-xl px-3 py-2">
+            <span className="text-emerald-500 font-bold text-sm">✓</span> Multi-Business
+          </div>
+          <div className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 border border-slate-200 bg-slate-50/70 rounded-xl px-3 py-2">
+            <span className="text-emerald-500 font-bold text-sm">✓</span> Smart PDF Parser
+          </div>
+          <div className="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 border border-slate-200 bg-slate-50/70 rounded-xl px-3 py-2">
+            <span className="text-emerald-500 font-bold text-sm">✓</span> Staff Roster &amp; Invites
+          </div>
+        </div>
       </div>
 
       {generalError && (
