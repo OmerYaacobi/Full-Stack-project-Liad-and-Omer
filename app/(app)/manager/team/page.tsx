@@ -84,20 +84,35 @@ export default async function ManagerTeamPage() {
                       {person.averageNet !== null ? "Last 12 months" : "Needs 3 months"}
                     </p>
                   </td>
-                  <td className="px-4 py-3 tabular-nums text-slate-700">
-                    {person.vacationAvailable !== null
-                      ? formatDays(person.vacationAvailable)
-                      : "—"}
+                  <td className="px-4 py-3 tabular-nums">
+                    {person.vacationAvailable !== null ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        🏖️ {formatDays(person.vacationAvailable)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 tabular-nums text-slate-700">
-                    {person.sickAvailable !== null
-                      ? formatDays(person.sickAvailable)
-                      : "—"}
+                  <td className="px-4 py-3 tabular-nums">
+                    {person.sickAvailable !== null ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        🩺 {formatDays(person.sickAvailable)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {person.pendingRequests > 0
-                      ? `${person.pendingRequests} request${person.pendingRequests === 1 ? "" : "s"}`
-                      : "—"}
+                  <td className="px-4 py-3">
+                    {person.pendingRequests > 0 ? (
+                      <Link
+                        href="/manager/approvals"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 transition border border-amber-200 shadow-2xs"
+                      >
+                        ⏳ {person.pendingRequests} pending
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-slate-400">None</span>
+                    )}
                   </td>
                 </tr>
               ))}

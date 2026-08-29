@@ -2,12 +2,11 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 
-import { uploadPayslip } from "@/lib/actions/payslips";
+import { uploadPayslip, type StoredPayslip } from "@/lib/actions/payslips";
 import type { CompanyEmployee } from "@/lib/actions/employees";
 import { parsePayslipAction } from "@/lib/actions/parse-payslip";
 import { ShareWithManagersField } from "@/components/shared/share-with-managers-field";
-import { PayslipLeaveFields } from "@/components/payslips/payslip-leave-fields";
-import { MONTHS } from "@/lib/validations/payslips";
+import { MONTHS, monthLabel } from "@/lib/validations/payslips";
 
 const FIELD_CLASSES =
   "mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 disabled:bg-slate-50";
@@ -22,9 +21,11 @@ function defaultPeriod() {
 export function PayslipUploadForm({
   companyId,
   employee,
+  existingPayslips = [],
 }: {
   companyId: string;
   employee: CompanyEmployee;
+  existingPayslips?: StoredPayslip[];
 }) {
   const [state, submit, pending] = useActionState(uploadPayslip, null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -36,8 +37,10 @@ export function PayslipUploadForm({
   const [grossPay, setGrossPay] = useState<string>("");
   const [netPay, setNetPay] = useState<string>("");
   const [totalDeductions, setTotalDeductions] = useState<string>("");
-  const [vacationDays, setVacationDays] = useState<string>("");
-  const [sickDays, setSickDays] = useState<string>("");
+
+  const isExistingSlip = existingPayslips.some(
+    (p) => p.year === year && p.month === month,
+  );
 
   // Parsing status state
   const [isParsing, setIsParsing] = useState(false);
@@ -57,8 +60,6 @@ export function PayslipUploadForm({
       setGrossPay("");
       setNetPay("");
       setTotalDeductions("");
-      setVacationDays("");
-      setSickDays("");
       setParseNotice(null);
     }
   }, [state]);
@@ -77,7 +78,15 @@ export function PayslipUploadForm({
       const res = await parsePayslipAction(formData);
 
       if (res.success && res.data) {
-        const { net_pay, gross_pay, total_deductions, period_month, period_year, employee_name, employee_id, vacation_days, sick_days } = res.data;
+        const {
+          net_pay,
+          gross_pay,
+          total_deductions,
+          period_month,
+          period_year,
+          employee_name,
+          employee_id,
+        } = res.data;
 
         const filledFields: string[] = [];
 
@@ -98,14 +107,6 @@ export function PayslipUploadForm({
         }
         if (period_year !== null && period_year !== undefined) {
           setYear(period_year);
-        }
-        if (vacation_days !== null && vacation_days !== undefined) {
-          setVacationDays(String(vacation_days));
-          filledFields.push(`Vacation: ${vacation_days} days`);
-        }
-        if (sick_days !== null && sick_days !== undefined) {
-          setSickDays(String(sick_days));
-          filledFields.push(`Sick: ${sick_days} days`);
         }
 
         let detailText = "";
@@ -257,6 +258,15 @@ export function PayslipUploadForm({
           />
         </div>
 
+        {isExistingSlip && (
+          <div className="sm:col-span-2 rounded-xl border border-indigo-200 bg-indigo-50/80 p-3 text-xs text-indigo-900 flex items-start gap-2 shadow-2xs">
+            <span className="text-base shrink-0">ℹ️</span>
+            <div>
+              <strong>Existing payslip on file:</strong> A payslip for <strong>{monthLabel(month)} {year}</strong> already exists for {employee.nationalId || employee.employeeNumber ? `ID: ${employee.nationalId || employee.employeeNumber} (${employee.fullName})` : employee.fullName}. Uploading will update and replace the existing file.
+            </div>
+          </div>
+        )}
+
         <div>
           <label htmlFor="grossPay" className="block text-sm font-medium text-slate-700">
             Gross <span className="text-slate-400">(optional)</span>
@@ -316,14 +326,6 @@ export function PayslipUploadForm({
           />
           <FieldError messages={fieldErrors?.totalDeductions} />
         </div>
-
-        <PayslipLeaveFields
-          vacationDays={vacationDays}
-          sickDays={sickDays}
-          onVacationChange={setVacationDays}
-          onSickChange={setSickDays}
-          disabled={pending}
-        />
 
         <ShareWithManagersField disabled={pending} />
       </div>

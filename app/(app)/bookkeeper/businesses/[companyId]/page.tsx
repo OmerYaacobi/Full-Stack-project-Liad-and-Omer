@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { countDocumentsByEmployee } from "@/lib/actions/documents";
 import { listCompanyEmployees, listCompanyManagers } from "@/lib/actions/employees";
+import { listCompanyExistingPayslipKeys } from "@/lib/actions/payslips";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -34,10 +35,11 @@ export default async function BusinessPage({
 
   if (!company) notFound();
 
-  const [employees, managers, perEmployeeCounts] = await Promise.all([
+  const [employees, managers, perEmployeeCounts, existingPayslipKeys] = await Promise.all([
     listCompanyEmployees(companyId),
     listCompanyManagers(companyId),
     countDocumentsByEmployee(companyId),
+    listCompanyExistingPayslipKeys(companyId),
   ]);
 
   const activePeople = employees.filter((row) => row.status !== "terminated");
@@ -72,6 +74,7 @@ export default async function BusinessPage({
           <SmartBusinessPayslipUpload
             companyId={companyId}
             employees={activePeople}
+            existingKeys={existingPayslipKeys}
           />
           <DocumentUploadForm
             companyId={companyId}

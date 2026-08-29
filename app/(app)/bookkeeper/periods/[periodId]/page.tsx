@@ -56,35 +56,76 @@ export default async function PayrollPeriodPage({
         </div>
       </div>
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-          <p className="text-xs font-medium text-slate-500">Assigned</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">
-            {period.assignedCount} / {period.employeeCount}
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-          <p className="text-xs font-medium text-slate-500">Published</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">
-            {period.publishedCount}
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-          <p className="text-xs font-medium text-slate-500">Waiting to publish</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">{waiting}</p>
-        </div>
-      </div>
+      {/* Progress Bar & Stat Cards */}
+      {(() => {
+        const progressPercent =
+          period.employeeCount > 0
+            ? Math.round((period.assignedCount / period.employeeCount) * 100)
+            : 0;
+        return (
+          <div className="mb-6 space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="flex items-center justify-between gap-4 mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Payslip Coverage Progress
+                </span>
+                <span className="text-sm font-extrabold text-indigo-600">
+                  {progressPercent}% · {period.assignedCount} of {period.employeeCount} uploaded
+                </span>
+              </div>
+              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-500 rounded-full ${
+                    progressPercent === 100
+                      ? "bg-emerald-500"
+                      : "bg-indigo-600"
+                  }`}
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
 
-      <p className="mb-4 text-sm text-slate-600">
-        Upload more PDFs from{" "}
-        <Link
-          href={`/bookkeeper/businesses/${period.companyId}`}
-          className="font-medium text-slate-900 underline underline-offset-2"
-        >
-          {period.companyName}
-        </Link>
-        .
-      </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  📄 Slips Uploaded
+                </p>
+                <p className="mt-1.5 text-xl font-bold text-slate-900">
+                  {period.assignedCount} <span className="text-sm font-normal text-slate-400">/ {period.employeeCount} staff</span>
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  👁️ Visible to Staff
+                </p>
+                <p className="mt-1.5 text-xl font-bold text-emerald-700">
+                  {period.publishedCount} <span className="text-sm font-normal text-emerald-600/70">published</span>
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  ⏳ Waiting to Publish
+                </p>
+                <p className="mt-1.5 text-xl font-bold text-amber-700">
+                  {waiting} <span className="text-sm font-normal text-amber-600/70">in draft</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      <div className="mb-6 flex items-center justify-between">
+        <p className="text-sm text-slate-600">
+          Upload more slips via{" "}
+          <Link
+            href={`/bookkeeper/businesses/${period.companyId}`}
+            className="font-bold text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
+          >
+            {period.companyName}
+          </Link>
+        </p>
+      </div>
 
       {period.employees.length === 0 ? (
         <EmptyState

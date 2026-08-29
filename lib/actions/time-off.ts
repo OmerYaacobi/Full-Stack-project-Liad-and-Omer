@@ -472,13 +472,31 @@ export async function listFirmPendingApprovals(): Promise<PendingApproval[]> {
   return buildPendingApprovals({});
 }
 
+export async function listEmployeePendingApprovals(
+  companyId: string,
+  employeeId: string,
+): Promise<PendingApproval[]> {
+  return buildPendingApprovals({
+    companyId,
+    targetEmployeeId: employeeId,
+  });
+}
+
+export async function listEmployeeTimeOffRequests(
+  employeeId: string,
+): Promise<TimeOffRequest[]> {
+  return listRequests({ employeeId });
+}
+
 async function buildPendingApprovals(filter: {
   companyId?: string;
   excludeEmployeeId?: string | null;
+  targetEmployeeId?: string;
 }): Promise<PendingApproval[]> {
   const pending = await listRequests({
     status: "pending",
     companyId: filter.companyId,
+    employeeId: filter.targetEmployeeId,
   });
   const visible = filter.excludeEmployeeId
     ? pending.filter((row) => row.employeeId !== filter.excludeEmployeeId)

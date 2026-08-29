@@ -236,6 +236,30 @@ export async function listPayslipsSharedWithManagers(
   return (data ?? []).flatMap((row) => toStored(row) ?? []);
 }
 
+export async function listCompanyExistingPayslipKeys(
+  companyId: string,
+): Promise<{ employeeId: string; year: number; month: number }[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("payslips")
+    .select("employee_id, payroll_periods(year, month)")
+    .eq("company_id", companyId);
+
+  if (error || !data) return [];
+  const results: { employeeId: string; year: number; month: number }[] = [];
+  for (const row of data as any[]) {
+    const period = Array.isArray(row.payroll_periods) ? row.payroll_periods[0] : row.payroll_periods;
+    if (row.employee_id && period?.year && period?.month) {
+      results.push({
+        employeeId: row.employee_id,
+        year: Number(period.year),
+        month: Number(period.month),
+      });
+    }
+  }
+  return results;
+}
+
 export async function setPayslipManagerShare(
   payslipId: string,
   visible: boolean,

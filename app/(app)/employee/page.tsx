@@ -45,6 +45,15 @@ export default async function EmployeeDashboardPage() {
             ? "A manager asked you to join their team. Answer below, then your pay and leave."
             : "Last take-home, how it compares, and the leave you still have."
         }
+        action={
+          <Link
+            href="/employee/time-off"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm shadow-xs transition"
+          >
+            <span>🏖️</span>
+            <span>Request Time Off</span>
+          </Link>
+        }
       />
 
       <IncomingTeamJoinList requests={teamAsks} />

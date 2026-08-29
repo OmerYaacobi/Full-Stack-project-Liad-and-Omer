@@ -497,6 +497,89 @@ export async function applyPayslipLeaveBalances(input: {
   }
 }
 
+/**
+ * Allows bookkeepers / admins to manually set or adjust an employee's starting or current available leave balances.
+ * Calculates entitled_days = desired_available + already_consumed_this_year so available balance exactly matches.
+ */
+export async function updateEmployeeLeaveBalances(input: {
+  companyId: string;
+  employeeId: string;
+  vacationDays: number;
+  sickDays: number;
+}): Promise<ActionResult<void>> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return fail("UNAUTHENTICATED", "You must be signed in.");
+  }
+
+  const year = new Date().getFullYear();
+  const { data: types } = await supabase
+    .from("leave_types")
+    .select("id, code")
+    .eq("company_id", input.companyId)
+    .eq("is_active", true);
+
+  if (!types?.length) {
+    return fail("NOT_FOUND", "No active leave types found for this company.");
+  }
+
+  const { data: requests } = await supabase
+    .from("time_off_requests")
+    .select("leave_type_id, working_days, status, start_date")
+    .eq("employee_id", input.employeeId);
+
+  const note = `Manual balance adjustment (${new Date().toLocaleDateString("en-GB")})`;
+
+  for (const type of types) {
+    const desiredAvailable =
+      type.code === "vacation"
+        ? input.vacationDays
+        : type.code === "sick"
+          ? input.sickDays
+          : null;
+    if (desiredAvailable === null) continue;
+
+    const consumed = (requests ?? [])
+      .filter(
+        (row) =>
+          row.leave_type_id === type.id &&
+          new Date(row.start_date).getFullYear() === year &&
+          (row.status === "approved" || row.status === "pending"),
+      )
+      .reduce((sum, row) => sum + Number(row.working_days), 0);
+
+    const entitled_days = round2(Math.max(0, desiredAvailable + consumed));
+
+    const { error } = await supabase.from("leave_entitlements").upsert(
+      {
+        company_id: input.companyId,
+        employee_id: input.employeeId,
+        leave_type_id: type.id,
+        year,
+        entitled_days,
+        note,
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "employee_id,leave_type_id,year" },
+    );
+
+    if (error) {
+      return fail("INTERNAL", `Failed to update ${type.code} balance: ${error.message}`);
+    }
+  }
+
+  revalidatePath(`/bookkeeper/businesses/${input.companyId}/employees/${input.employeeId}`);
+  revalidatePath(`/employee/time-off`);
+  revalidatePath(`/employee`);
+  revalidatePath(`/manager/team`);
+
+  return ok(undefined);
+}
+
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }

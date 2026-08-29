@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AssignManagerForm } from "@/components/employees/assign-manager-form";
+import { EmployeeLeaveBalanceCard } from "@/components/employees/employee-leave-balance-card";
+import { ApprovalCard } from "@/components/time-off/approval-card";
 import { TerminateEmployeeButton } from "@/components/employees/terminate-employee-button";
 import { DocumentFolder } from "@/components/documents/document-folder";
 import { DocumentUploadForm } from "@/components/documents/document-upload-form";
@@ -17,6 +19,10 @@ import {
   listCompanyManagers,
 } from "@/lib/actions/employees";
 import { listEmployeePayslips } from "@/lib/actions/payslips";
+import {
+  listEmployeeLeaveBalances,
+  listEmployeePendingApprovals,
+} from "@/lib/actions/time-off";
 import { createClient } from "@/lib/supabase/server";
 import { DOCUMENT_KINDS } from "@/lib/validations/documents";
 
@@ -43,11 +49,14 @@ export default async function EmployeeDocumentsPage({
   await ensureEmployeeEntitlements(companyId, employeeId, employee.startDate);
 
   const taxYear = new Date().getFullYear();
-  const [documents, payslips, hasForm101] = await Promise.all([
-    listCompanyDocuments(companyId, employeeId),
-    listEmployeePayslips(companyId, employeeId),
-    companyHasForm101ForYear(companyId, employeeId, taxYear),
-  ]);
+  const [documents, payslips, hasForm101, balances, pendingApprovals] =
+    await Promise.all([
+      listCompanyDocuments(companyId, employeeId),
+      listEmployeePayslips(companyId, employeeId),
+      companyHasForm101ForYear(companyId, employeeId, taxYear),
+      listEmployeeLeaveBalances(companyId, employeeId),
+      listEmployeePendingApprovals(companyId, employeeId),
+    ]);
 
   return (
     <>
@@ -93,6 +102,39 @@ export default async function EmployeeDocumentsPage({
         </p>
       )}
 
+      {/* Leave Balances Management Card */}
+      {employee.status !== "terminated" ? (
+        <div className="mb-8 space-y-6">
+          <EmployeeLeaveBalanceCard
+            companyId={companyId}
+            employeeId={employeeId}
+            employeeName={employee.fullName}
+            balances={balances}
+          />
+
+          {pendingApprovals.length > 0 && (
+            <div className="space-y-3 rounded-2xl border border-amber-200/80 bg-amber-50/40 p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span>⏳ Pending Time-Off Requests</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                    {pendingApprovals.length} waiting for decision
+                  </span>
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500">
+                You can approve or reject {employee.fullName.split(" ")[0]}&apos;s time-off requests directly from here.
+              </p>
+              <div className="space-y-3 pt-1">
+                {pendingApprovals.map((req) => (
+                  <ApprovalCard key={req.id} request={req} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
+
       {employee.status !== "terminated" ? (
         <AssignManagerForm
           companyId={companyId}
@@ -103,7 +145,11 @@ export default async function EmployeeDocumentsPage({
 
       {employee.status !== "terminated" ? (
         <div className="mt-8">
-          <PayslipUploadForm companyId={companyId} employee={employee} />
+          <PayslipUploadForm
+            companyId={companyId}
+            employee={employee}
+            existingPayslips={payslips}
+          />
         </div>
       ) : null}
 

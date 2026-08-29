@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 
-import { PayslipLeaveFields } from "@/components/payslips/payslip-leave-fields";
 import { ShareWithManagersField } from "@/components/shared/share-with-managers-field";
 import { uploadPayslip } from "@/lib/actions/payslips";
 import type { CompanyEmployee } from "@/lib/actions/employees";
@@ -88,9 +87,11 @@ async function runPool<T>(
 export function SmartBusinessPayslipUpload({
   companyId,
   employees,
+  existingKeys = [],
 }: {
   companyId: string;
   employees: CompanyEmployee[];
+  existingKeys?: { employeeId: string; year: number; month: number }[];
 }) {
   const period = defaultPeriod();
 
@@ -106,6 +107,7 @@ export function SmartBusinessPayslipUpload({
 
   const parsingCount = drafts.filter((draft) => draft.status === "parsing").length;
   const readyDrafts = drafts.filter((draft) => draft.employeeId && draft.status !== "parsing");
+
   const duplicateKeys = useMemo(() => {
     const counts = new Map<string, number>();
     for (const draft of drafts) {
@@ -117,6 +119,14 @@ export function SmartBusinessPayslipUpload({
       [...counts.entries()].filter(([, count]) => count > 1).map(([key]) => key),
     );
   }, [drafts]);
+
+  const dbDuplicateKeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of existingKeys) {
+      set.add(`${item.employeeId}:${item.year}-${item.month}`);
+    }
+    return set;
+  }, [existingKeys]);
 
   const groups = useMemo(() => {
     const order: string[] = [];
@@ -384,9 +394,13 @@ export function SmartBusinessPayslipUpload({
             </h3>
             {group.drafts.map((draft) => {
               const employee = employees.find((row) => row.id === draft.employeeId) ?? null;
-              const isDuplicate = Boolean(
+              const isBatchDuplicate = Boolean(
                 draft.employeeId &&
                   duplicateKeys.has(`${draft.employeeId}:${draft.year}-${draft.month}`),
+              );
+              const isDbDuplicate = Boolean(
+                draft.employeeId &&
+                  dbDuplicateKeys.has(`${draft.employeeId}:${draft.year}-${draft.month}`),
               );
               return (
                 <DraftCard
@@ -394,7 +408,8 @@ export function SmartBusinessPayslipUpload({
                   draft={draft}
                   employee={employee}
                   employees={employees}
-                  isDuplicate={isDuplicate}
+                  isBatchDuplicate={isBatchDuplicate}
+                  isDbDuplicate={isDbDuplicate}
                   disabled={isSaving}
                   onChange={(patch) => patchDraft(draft.id, patch)}
                   onRemove={() => removeDraft(draft.id)}
@@ -464,7 +479,8 @@ function DraftCard({
   draft,
   employee,
   employees,
-  isDuplicate,
+  isBatchDuplicate,
+  isDbDuplicate,
   disabled,
   onChange,
   onRemove,
@@ -472,7 +488,8 @@ function DraftCard({
   draft: PayslipDraft;
   employee: CompanyEmployee | null;
   employees: CompanyEmployee[];
-  isDuplicate: boolean;
+  isBatchDuplicate: boolean;
+  isDbDuplicate: boolean;
   disabled: boolean;
   onChange: (patch: Partial<PayslipDraft>) => void;
   onRemove: () => void;
@@ -509,10 +526,22 @@ function DraftCard({
         </p>
       )}
 
-      {isDuplicate && (
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
-          Another file in this batch is for the same person and month. Saving will replace the earlier slip.
-        </p>
+      {isBatchDuplicate && (
+        <div className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-2">
+          <span className="shrink-0">⚠️</span>
+          <div>
+            <strong>Duplicate in this upload batch:</strong> Another file in this upload is assigned to {employee?.fullName || "this person"} for {draft.month}/{draft.year}. Saving will overwrite earlier files in the batch.
+          </div>
+        </div>
+      )}
+
+      {isDbDuplicate && !isBatchDuplicate && (
+        <div className="text-xs text-indigo-900 bg-indigo-50/70 border border-indigo-200 rounded-lg p-2.5 flex items-start gap-2">
+          <span className="shrink-0">ℹ️</span>
+          <div>
+            <strong>Existing payslip on file:</strong> A payslip for {employee?.fullName || "this person"} for {draft.month}/{draft.year} already exists in the system. Saving will update and replace it.
+          </div>
+        </div>
       )}
 
       {draft.status !== "parsing" && (
@@ -619,18 +648,6 @@ function DraftCard({
                 className={FIELD_CLASSES}
               />
             </label>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <PayslipLeaveFields
-              idPrefix={`${draft.id}-`}
-              vacationDays={draft.vacationDays}
-              sickDays={draft.sickDays}
-              onVacationChange={(value) => onChange({ vacationDays: value })}
-              onSickChange={(value) => onChange({ sickDays: value })}
-              disabled={disabled}
-              compact
-            />
           </div>
         </>
       )}

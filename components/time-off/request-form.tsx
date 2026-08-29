@@ -239,26 +239,33 @@ export function TimeOffRequestForm({
       </div>
 
       {previewText && (
-        <p
-          className={
-            insufficient || preview?.workingDays === 0
-              ? "mt-3 text-sm text-red-600"
-              : "mt-3 text-sm text-slate-600"
-          }
+        <div
+          className={`mt-4 p-3.5 rounded-xl border text-xs sm:text-sm flex items-start gap-2.5 transition-all shadow-2xs ${
+            insufficient
+              ? "border-red-200 bg-red-50/80 text-red-800"
+              : preview?.workingDays === 0
+                ? "border-amber-200 bg-amber-50/80 text-amber-800"
+                : "border-indigo-200 bg-indigo-50/60 text-indigo-900"
+          }`}
         >
-          {previewText}
-        </p>
+          <span className="text-base shrink-0">
+            {insufficient ? "⚠️" : preview?.workingDays === 0 ? "ℹ️" : "✨"}
+          </span>
+          <div className="flex-1 font-medium leading-relaxed">{previewText}</div>
+        </div>
       )}
 
       {formError && (
-        <p role="alert" className="mt-3 text-sm text-red-600">
-          {formError}
-        </p>
+        <div role="alert" className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-700 flex items-center gap-2">
+          <span>⚠️</span>
+          <span>{formError}</span>
+        </div>
       )}
       {state?.ok && (
-        <p role="status" className="mt-3 text-sm text-emerald-700">
-          Request sent. It stays pending until a manager or bookkeeper decides.
-        </p>
+        <div role="status" className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs sm:text-sm text-emerald-800 flex items-center gap-2">
+          <span>✓</span>
+          <span>Request sent successfully! It stays pending until a manager or bookkeeper approves.</span>
+        </div>
       )}
 
       <button
@@ -269,13 +276,15 @@ export function TimeOffRequestForm({
           (!useRemaining && preview?.workingDays === 0) ||
           (useRemaining && remainingDays <= 0)
         }
-        className="mt-4 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+        className="mt-5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-xs hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
       >
-        {pending
-          ? "Sending…"
-          : useRemaining
-            ? "Request remaining days"
-            : "Submit request"}
+        {pending ? (
+          <span>Sending Request...</span>
+        ) : useRemaining ? (
+          <span>Request All Remaining Days →</span>
+        ) : (
+          <span>Submit Time-Off Request →</span>
+        )}
       </button>
     </form>
   );

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { navGroupsFor } from "@/components/layout/nav-items";
 import { RoleBadge } from "@/components/layout/role-badge";
@@ -19,17 +20,32 @@ export function AppShell({
   impersonating?: boolean;
   children: ReactNode;
 }) {
+  const homeHref =
+    workspace.role === "bookkeeper"
+      ? "/bookkeeper"
+      : workspace.role === "manager"
+        ? "/manager"
+        : "/employee";
+
   return (
     <div className="min-h-dvh bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-slate-200 bg-white sticky top-0 z-20 shadow-2xs">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <span className="font-semibold tracking-tight text-slate-900">
-            Payroll Portal
-          </span>
+          <Link
+            href={homeHref}
+            className="flex items-center gap-2.5 font-bold text-slate-900 text-sm sm:text-base hover:opacity-90 transition group"
+          >
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-600 to-indigo-500 text-white flex items-center justify-center font-extrabold text-sm shadow-sm shadow-indigo-600/30 group-hover:scale-105 transition-transform">
+              ₪
+            </div>
+            <span className="tracking-tight">
+              Payroll<span className="text-indigo-600 font-extrabold">Portal</span>
+            </span>
+          </Link>
           <span className="text-slate-300" aria-hidden="true">
             /
           </span>
-          <span className="text-sm text-slate-600">{workspace.name}</span>
+          <span className="text-sm font-medium text-slate-600">{workspace.name}</span>
 
           <div className="ms-auto flex items-center gap-3">
             {impersonating && (
