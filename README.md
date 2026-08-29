@@ -103,6 +103,23 @@ the library has to write the session cookie itself.
 
 ## Documentation
 
+Course deliverables (Hebrew) live under [`docs/`](docs/README.md). Open
+[`docs/presentation.html`](docs/presentation.html) in a browser for the 10–15
+minute talk (arrow keys; `N` toggles speaker notes; print to PDF if needed).
+
+| Assignment | File |
+| --- | --- |
+| אפיון מוצר | [docs/01-product-spec.md](docs/01-product-spec.md) |
+| ארכיטקטורה | [docs/02-architecture.md](docs/02-architecture.md) |
+| תכנון טכני מפורט | [docs/03-technical-plan.md](docs/03-technical-plan.md) |
+| אפיון בדיקות | [docs/04-test-spec.md](docs/04-test-spec.md) |
+| תיעוד בדיקות | [docs/05-test-report.md](docs/05-test-report.md) |
+| סקייל בסיסי | [docs/06-scale.md](docs/06-scale.md) |
+| אבטחה בסיסית | [docs/07-security.md](docs/07-security.md) |
+| מצגת | [docs/presentation.html](docs/presentation.html) |
+
+English technical-design set (schema, RLS, API, UX):
+
 | Document | Contents |
 | --- | --- |
 | [Overview](docs/technical-design/00-overview.md) | Scope, stack, roles, permission matrix |

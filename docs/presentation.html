@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PayrollPortal — מצגת הגשה</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --line: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #818cf8;
+      --accent-2: #34d399;
+      --warn: #fbbf24;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      height: 100%;
+    }
+    .deck { height: 100%; overflow: hidden; }
+    .slide {
+      display: none;
+      height: 100%;
+      padding: 4.5rem 5rem 5.5rem;
+      flex-direction: column;
+      justify-content: center;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .slide.active { display: flex; }
+    h1 { font-size: 2.6rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+    h2 { font-size: 2rem; font-weight: 750; margin-bottom: 1.4rem; }
+    h3 { font-size: 1.05rem; color: var(--accent); font-weight: 700; margin-bottom: 0.4rem; }
+    p, li { font-size: 1.15rem; line-height: 1.55; color: var(--text); }
+    .muted { color: var(--muted); }
+    .kicker {
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.8rem;
+    }
+    ul { padding-inline-start: 1.2rem; }
+    li { margin: 0.45rem 0; }
+    .grid { display: grid; gap: 1rem; }
+    .g3 { grid-template-columns: 1fr 1fr 1fr; }
+    .g2 { grid-template-columns: 1fr 1fr; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.1rem 1.2rem;
+    }
+    .card strong { display: block; font-size: 1.05rem; margin-bottom: 0.35rem; }
+    .card p, .card li { font-size: 0.98rem; color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; font-size: 1rem; }
+    th, td { text-align: right; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line); }
+    th { color: var(--accent); font-weight: 650; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.92em;
+      background: #0b1220;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+    .arch {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin: 1.2rem 0;
+    }
+    .arch .box {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.85rem 1.1rem;
+      text-align: center;
+      min-width: 9.5rem;
+    }
+    .arch .box small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem; }
+    .arch .arrow { color: var(--accent); font-size: 1.4rem; }
+    .bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.7rem 1.4rem;
+      background: #0b1220;
+      border-top: 1px solid var(--line);
+      font-size: 0.85rem;
+      color: var(--muted);
+      z-index: 2;
+    }
+    .bar button {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.35rem 0.8rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .notes {
+      display: none;
+      margin-top: 1.4rem;
+      padding: 0.8rem 1rem;
+      border-right: 3px solid var(--accent);
+      background: #0b1220;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    body.show-notes .notes { display: block; }
+    .tag { color: var(--accent-2); font-weight: 700; }
+    @media print {
+      html, body, .deck { height: auto; background: #fff; color: #0f172a; }
+      .slide {
+        display: flex !important;
+        page-break-after: always;
+        height: 100vh;
+        color: #0f172a;
+      }
+      .slide p, .slide li, .card p, .card li { color: #334155; }
+      .card, .arch .box { background: #f8fafc; border-color: #cbd5e1; }
+      .bar { display: none; }
+      .notes { display: block; color: #64748b; background: #f1f5f9; }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck">
+
+    <section class="slide active">
+      <div class="kicker">Internet Technologies · RUNI CS 2026</div>
+      <h1>PayrollPortal</h1>
+      <p style="margin-top: 1rem; font-size: 1.4rem;">פורטל שכר והנהלת חשבונות לעסקים קטנים ובינוניים</p>
+      <p class="muted" style="margin-top: 1.6rem;">ליעד פילוסוף ועומר יעקבי</p>
+      <p class="muted">Next.js · TypeScript · Supabase · Vercel</p>
+      <div class="notes">פתיחה (~45 שניות): שם המוצר, הקורס, מי אנחנו. אל תיכנסו לדמו עדיין — קודם הבעיה.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">הבעיה</div>
+      <h2>השכר כבר מחושב. ההפצה שבורה.</h2>
+      <ul>
+        <li>עובד מבקש תלוש או 106 ב-WhatsApp — והמשרד שולח PDF בודד.</li>
+        <li>מנהל מאשר חופשה באקסל, בלי יתרה ובלי לדעת מי עוד בחופש.</li>
+        <li>אף אחד לא עונה על «כמה נוכה ממני השנה?» בלי תריסר קבצים.</li>
+        <li>משרד עם כמה לקוחות מחזיק תיקיות, בלי הפרדת הרשאות ברורה.</li>
+      </ul>
+      <p class="muted" style="margin-top: 1.2rem;">אנחנו לא מחליפים את תוכנת השכר. אנחנו מחליפים את שרשרת המיילים.</p>
+      <div class="notes">~1 דקה. הדגישו: out of scope = חישוב ברוטו-נטו. in scope = שקיפות + הרשאות.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">משתמשים ולקוח</div>
+      <h2>B2B עם שלושה קהלים</h2>
+      <div class="grid g3">
+        <div class="card">
+          <strong>הלקוח: המשרד</strong>
+          <p>פירמת הנהלת חשבונות. מביאה כמה עסקי SMB, מעלה תלושים, מזמינה צוות.</p>
+        </div>
+        <div class="card">
+          <strong>עובד / מנהל</strong>
+          <p>משתמשי הקצה של הלקוח. מנהל הוא גם עובד: סביבה אישית + סביבת צוות.</p>
+        </div>
+        <div class="card">
+          <strong>ה-tenant</strong>
+          <p>כל עסק לקוח הוא חברה נפרדת. המשרד מנהל רבות; עובד רואה רק את שלו.</p>
+        </div>
+      </div>
+      <div class="notes">~45 שניות. «מי משלם» = המשרד. «מי משתמש» = שלושת התפקידים.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">ערך עסקי</div>
+      <h2>למה זה חוסך כסף וזמן</h2>
+      <ul>
+        <li><span class="tag">למשרד</span> — העלאה מרובה, שידוך לפי ת.ז., פרסום חודש, קישורי הצטרפות.</li>
+        <li><span class="tag">לעובד</span> — שירות עצמי: תלוש, יתרת חופשה, 101, בלי ping למשרד.</li>
+        <li><span class="tag">למנהל</span> — תור אישורים עם יתרה וחפיפה, לוח שנה של מי בחופש.</li>
+        <li><span class="tag">לכולם</span> — פחות טעויות הפצה: טיוטה לא גלויה, שיתוף per-file, תפקיד מההזמנה.</li>
+      </ul>
+      <div class="notes">~1 דקה. חברו כל יתרון ליכולת שבניתם, לא לסיסמה שיווקית.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">המוצר</div>
+      <h2>שלושה בתים, אפליקציה אחת</h2>
+      <div class="grid g3">
+        <div class="card">
+          <strong>עובד · /employee</strong>
+          <p>תובנות שכר, יתרות, תלושים, מסמכים, בקשת חופשה, טופס 101, אישור צירוף לצוות.</p>
+        </div>
+        <div class="card">
+          <strong>מנהל · /manager</strong>
+          <p>אותה סביבה אישית, פלוס תור אישורים, צוות בהסכמה, קבצים משותפים, לוח שנה.</p>
+        </div>
+        <div class="card">
+          <strong>משרד · /bookkeeper</strong>
+          <p>כמה עסקים, תקופות draft→publish, פענוח PDF, מסמכי HR, אישור כשאין מנהל קו.</p>
+        </div>
+      </div>
+      <div class="notes">כאן דמו קצר אם הזמן מאפשר (2–3 דקות): פרסום חודש אצל המשרד → רענון אצל העובד. אחרת — המשך ארכיטקטורה ודמו בסוף.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">ארכיטקטורה</div>
+      <h2>RSC + Actions מול Postgres עם RLS</h2>
+      <div class="arch">
+        <div class="box">Browser<small>React 19</small></div>
+        <span class="arrow">←</span>
+        <div class="box">Next.js / Vercel<small>RSC · Actions · Routes</small></div>
+        <span class="arrow">←</span>
+        <div class="box">Supabase<small>Auth · Postgres · Storage</small></div>
+      </div>
+      <ul>
+        <li>קריאות שכר ב-<strong>Server Components</strong> — לא ב-JS של הדפדפן.</li>
+        <li>כתיבות ב-<strong>Server Actions</strong> + Zod. אין REST CRUD ציבורי.</li>
+        <li>מצבי workflow ב-<strong>RPC</strong> עם נעילת שורה (חופשה, פרסום, צוות).</li>
+        <li>קבצים בבאקטים פרטיים; הורדה ב-URL חתום ל-~120 שניות.</li>
+        <li><code>service_role</code> לא נמצא בקוד. ה-anon key ציבורי במכוון — RLS מחליט.</li>
+      </ul>
+      <div class="notes">~1.5 דקות. המשפט לזכור: «RLS הוא גבול ההרשאה, לא ה-middleware».</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">בסיס הנתונים</div>
+      <h2>Tenant לפי חברה, תפקיד בטבלה</h2>
+      <table>
+        <thead>
+          <tr><th>אזור</th><th>טבלאות</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>זהות</td><td><code>profiles</code>, <code>memberships</code>, <code>firm_memberships</code></td></tr>
+          <tr><td>שכר</td><td><code>payroll_periods</code>, <code>payslips</code> — unique לפי עובד+חודש</td></tr>
+          <tr><td>חופשה</td><td>מכסות + בקשות; EXCLUDE gist נגד חפיפה</td></tr>
+          <tr><td>קבצים</td><td><code>documents</code>, צרופות חופשה; שיתוף <code>visible_to_managers</code></td></tr>
+          <tr><td>צוות</td><td><code>team_join_requests</code> — מנהל מבקש, עובד מאשר</td></tr>
+        </tbody>
+      </table>
+      <p class="muted" style="margin-top: 1rem;">תפקיד מ-<code>invitations.role</code> ב-trigger. לא מ-<code>user_metadata</code> (המשתמש יכול לשכתב אותו).</p>
+      <div class="notes">~1 דקה. אם שואלים על ER: firm → companies → employees → payslips / time_off.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">תהליכים מרכזיים</div>
+      <h2>שלושה flows שחייבים לעבוד</h2>
+      <div class="grid g2">
+        <div class="card">
+          <strong>1. פרסום חודש</strong>
+          <p>טיוטה → העלאת PDF → פענוח מציע עובד → אדם מאשר הקצאה → Publish ב-RPC. לפני publish העובד רואה ריק.</p>
+        </div>
+        <div class="card">
+          <strong>2. חופשה</strong>
+          <p>השרת מחשב ימי עבודה. pending צורך יתרה. מנהל או משרד מחליטים. אי אפשר לאשר את עצמך.</p>
+        </div>
+        <div class="card">
+          <strong>3. צירוף לצוות</strong>
+          <p>מנהל מבקש, עובד מאשר. המשרד יכול לשייך מנהל קו ישירות. הסרה מהצוות ≠ סיום העסקה.</p>
+        </div>
+        <div class="card">
+          <strong>הקצאה שגויה = הכשלון הגרוע</strong>
+          <p>שידוך אוטומטי הוא הצעה בלבד. משכורת של אחר גלויה זו תקלה שלא מתקנים ב-UX.</p>
+        </div>
+      </div>
+      <div class="notes">~1.5 דקות. אם נשאר זמן — דמו של אחד מהשלושה במסך מלא.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">בדיקות</div>
+      <h2>מה זה אומר שהמוצר «עובד»</h2>
+      <ul>
+        <li><strong>תהליכים:</strong> E1 פרסום שכר, E2 חופשה עד אישור, E3 צוות בהסכמה.</li>
+        <li><strong>הרשאות:</strong> עובד A לא קורא את B; אין כתיבת שכר לעובד; אין אישור עצמי; אין חציית עסק.</li>
+        <li><strong>קלט רע:</strong> נטו &gt; ברוטו, PDF מזויף, חופשה מעל יתרה / מעל 90 יום — נדחים ב-Zod, לא ב-500.</li>
+        <li><strong>מסד:</strong> unique לתלוש, EXCLUDE לחפיפה, RPC אטומי לפרסום.</li>
+      </ul>
+      <p class="muted" style="margin-top: 1rem;">היום: יומן ידני מתועד. הבא: Vitest על <code>lib/domain</code> + מקרי RLS עם JWT.</p>
+      <div class="notes">~45 שניות. היו כנים: אין עץ tests עדיין; האפיון והיומן הם החוזה, והאוטומציה היא הצעד הבא.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">סקייל</div>
+      <h2>עשרות–מאות משתמשים, לא מיליונים</h2>
+      <div class="grid g2">
+        <div class="card">
+          <strong>מה מחזיק</strong>
+          <p>אינדקסים לפי <code>company_id</code> / <code>employee_id</code> / pending. RSC בלי waterfall. תקרת 30 PDF. לוח שנה לפי <code>?month=</code>.</p>
+        </div>
+        <div class="card">
+          <strong>מה יישבר קודם</strong>
+          <p>ארון מסמכים של כל הפירמה בלי pagination. פענוח PDF סינכרוני מול timeout של Vercel.</p>
+        </div>
+      </div>
+      <p style="margin-top: 1.1rem;">עובד שנכנס לתלוש שלו = כמה שורות ממנוכסות. זה לא העומס. העומס הוא המשרד שמעלה ומציג הכל בבת אחת.</p>
+      <div class="notes">~1 דקה. «אינדקס + RLS lookup ≠ seq scan על כל התלושים».</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">אבטחה</div>
+      <h2>ארבע שכבות, גבול אחד אמיתי</h2>
+      <ol>
+        <li><code>proxy.ts</code> — בלי סשן אין אפליקציה.</li>
+        <li><code>requireRole</code> — UX; תוקף שמזמן Action עדיין פוגש את 3–4.</li>
+        <li>Action + Zod — כשל מהיר, הודעה ברורה.</li>
+        <li><strong>RLS + RPC</strong> — גם בלי Next.js, Postgres חוסם.</li>
+      </ol>
+      <p style="margin-top: 1rem;">תפקיד ב-<code>memberships</code>, לא ב-JWT שהמשתמש כותב. קבצים פרטיים. אין <code>service_role</code> ב-env הציבורי.</p>
+      <p class="muted">נשאר: קישור מנהל שדלף, בלי 2FA למשרד, בלי rate limit, בלי סויטת RLS ב-CI.</p>
+      <div class="notes">~1.5 דקות. אם שואלים שאלה אחת — תפקיד ב-user_metadata. זה הסיפור החזק.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">אם היה עוד זמן</div>
+      <h2>מה היינו משפרים</h2>
+      <ul>
+        <li>Vitest ל-domain + Playwright ל-E1–E3 + בדיקות RLS ב-CI.</li>
+        <li>Pagination לארון המסמכים ולתור הפירמה; תור רקע לפענוח PDF.</li>
+        <li>מייל / התראות למנהל שמחכה בקשה — היום רק רענון דף.</li>
+        <li>2FA למשרד, מדיניות סיסמה חזקה יותר, CSP headers.</li>
+        <li>ממשק עברית RTL — המשתמשים דוברים עברית, הכרום באנגלית.</li>
+        <li>לא ב-v1 במכוון: חישוב שכר, רשות המסים, צבירת חופשה אוטומטית.</li>
+      </ul>
+      <div class="notes">~45 שניות. שמרו על «קטן, ברור, מאובטח» — זו שורת הקורס.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">הגשה</div>
+      <h1>תודה</h1>
+      <p style="margin-top: 1.2rem;">GitHub: <code>LiadPilosof/Full-Stack-project-Liad-and-Omer</code></p>
+      <p class="muted" style="margin-top: 0.4rem;">Vercel: להשלים בהגשה · מסמכים ב-<code>docs/</code></p>
+      <p style="margin-top: 2rem; font-size: 1.2rem;">שאלות — כולל «תראו בקונסול ש-role ב-metadata לא עוזר».</p>
+      <div class="notes">סגירה: קישור חי, דמו אם עוד לא היה, ואז שאלות. אל תסיימו ב«זהו» בלי URL.</div>
+    </section>
+
+  </div>
+
+  <div class="bar">
+    <span>PayrollPortal · לחצו → או רווח · N להערות מגיש</span>
+    <span>
+      <button type="button" id="prev">הקודם</button>
+      <span id="pos">1 / 13</span>
+      <button type="button" id="next">הבא</button>
+    </span>
+  </div>
+
+  <script>
+    const slides = [...document.querySelectorAll(".slide")];
+    const pos = document.getElementById("pos");
+    let i = 0;
+    function show(n) {
+      i = Math.max(0, Math.min(slides.length - 1, n));
+      slides.forEach((s, idx) => s.classList.toggle("active", idx === i));
+      pos.textContent = i + 1 + " / " + slides.length;
+    }
+    document.getElementById("next").onclick = () => show(i + 1);
+    document.getElementById("prev").onclick = () => show(i - 1);
+    document.addEventListener("keydown", (e) => {
+      if (["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"].includes(e.key)) {
+        e.preventDefault();
+        show(i + 1);
+      }
+      if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(e.key)) {
+        e.preventDefault();
+        show(i - 1);
+      }
+      if (e.key === "n" || e.key === "N") {
+        document.body.classList.toggle("show-notes");
+      }
+      if (e.key === "Home") show(0);
+      if (e.key === "End") show(slides.length - 1);
+    });
+  </script>
+</body>
+</html>
