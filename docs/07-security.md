@@ -31,7 +31,7 @@
 
 1. **`proxy.ts`** — בלי סשן, כל נתיב לא-ציבורי → `/login`. לא יודע תפקיד (אין DB כאן).
 2. **`requireRole` ב-layout** — מנהל לא רואה shell של משרד; מופנה ל-`roleHome`. זה לא אבטחה מול תוקף שמזמן Action ישירות.
-3. **Server Action** — אחרי Zod, קורא את הלקוח עם JWT. נכשל مبחור עם הודעה קריאה. לא מחליף RLS.
+3. **Server Action** — אחרי Zod, קורא את הלקוח עם JWT. נכשל מוקדם עם הודעה קריאה ומובנת. לא מחליף RLS.
 4. **Postgres RLS + RPCs** — מדיניות על כל טבלת tenant. `anon` כמעט בלי גישה (חריג: קריאת הזמנה לפי טוקן כדי להציג שם עסק). `service_role` **לא בשימוש**.
 
 עוזרי SQL ב-schema `app`, `security definer`, עם `search_path` קבוע:

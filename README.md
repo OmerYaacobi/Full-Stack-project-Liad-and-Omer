@@ -50,6 +50,7 @@ Supabase SQL editor if the remote database is behind the repo.
 | `npm run dev` | Development server with hot reload |
 | `npm run build` | Production build |
 | `npm run start` | Serve the production build |
+| `npm test` | Run automated unit test suite (20 tests) |
 | `npm run lint` | ESLint |
 | `npx tsc --noEmit` | Typecheck without emitting files |
 
