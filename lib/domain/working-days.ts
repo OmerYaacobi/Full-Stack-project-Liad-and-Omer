@@ -60,6 +60,7 @@ function weekdaySunday0(ymd: Ymd): number {
 }
 
 export function eachIsoDateInclusive(start: string, end: string): string[] {
+  if (start > end) return [];
   const dates: string[] = [];
   let current = parse(start);
   const lastIso = format(parse(end));

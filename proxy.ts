@@ -4,7 +4,15 @@ import { devAuthRole } from "@/lib/auth/dev-auth";
 import { updateSession } from "@/lib/supabase/session";
 
 // Reachable without a session. Everything else redirects to /login.
-const PUBLIC_PATHS = ["/login", "/verify", "/auth", "/signup", "/invite"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/verify",
+  "/auth",
+  "/signup",
+  "/invite",
+  "/terms",
+  "/privacy",
+];
 
 export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request);

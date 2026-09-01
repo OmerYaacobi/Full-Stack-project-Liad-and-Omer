@@ -135,6 +135,12 @@ export default async function Home() {
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span>© {new Date().getFullYear()} SMB Payroll & Multi-Business Portal. All rights reserved.</span>
           <div className="flex gap-6">
+            <Link href="/terms" className="hover:text-indigo-600 transition">
+              Terms of Service
+            </Link>
+            <Link href="/privacy" className="hover:text-indigo-600 transition">
+              Privacy Policy
+            </Link>
             <Link href="/signup/bookkeeper" className="hover:text-indigo-600 transition">
               Company Registration
             </Link>

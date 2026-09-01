@@ -456,10 +456,12 @@ export async function applyPayslipLeaveBalances(input: {
 
   if (!types?.length) return;
 
-  const { data: requests } = await supabase
+  const { data: requests, error: reqError } = await supabase
     .from("time_off_requests")
     .select("leave_type_id, working_days, status, start_date")
     .eq("employee_id", input.employeeId);
+
+  if (reqError) return;
 
   const note = `Pay slip ${String(input.month).padStart(2, "0")}/${input.year}`;
 
@@ -526,10 +528,14 @@ export async function updateEmployeeLeaveBalances(input: {
     return fail("NOT_FOUND", "No active leave types found for this company.");
   }
 
-  const { data: requests } = await supabase
+  const { data: requests, error: reqError } = await supabase
     .from("time_off_requests")
     .select("leave_type_id, working_days, status, start_date")
     .eq("employee_id", input.employeeId);
+
+  if (reqError) {
+    return fail("INTERNAL", "Could not read leave history.");
+  }
 
   const note = `Manual balance adjustment (${new Date().toLocaleDateString("en-GB")})`;
 

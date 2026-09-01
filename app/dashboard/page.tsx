@@ -20,13 +20,12 @@ export default function DashboardPage() {
     name: string;
   } | null>(null);
 
-  const supabase = createClient();
-
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
+      const supabase = createClient();
       // Ensure client session is synced
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -54,7 +53,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase.auth]);
+  }, []);
 
   useEffect(() => {
     loadData();

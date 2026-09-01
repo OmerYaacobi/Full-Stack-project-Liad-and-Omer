@@ -1360,11 +1360,6 @@ export async function parseDigitalPayslipPdf(
   try {
     const { text: rawText, items } = await extractPdfLayout(pdfBuffer);
 
-    console.log("=== PAYSIP PDF PARSE DEBUG ===");
-    console.log("Extracted raw text length:", rawText.length);
-    console.log(rawText.slice(0, 800));
-    console.log("===============================");
-
     const alphanumericCount = (rawText.match(/[\p{L}\p{N}]/gu) || []).length;
     const lines: string[] = rawText
       .split(/\r?\n/)
@@ -1376,7 +1371,6 @@ export async function parseDigitalPayslipPdf(
     const employeeName = extractEmployeeName(rawText, lines);
     const period = extractPeriod(rawText, lines, filename);
     const leave = extractLeaveBalances(rawText, lines, items);
-    console.log("Leave table (row × יתרה):", leave);
 
     // 2. Direct Explicit Label Extraction (Highest Priority)
     let netPay = extractNetPayFromLabels(rawText, lines);
@@ -1397,7 +1391,6 @@ export async function parseDigitalPayslipPdf(
     if (grossPay === null || netPay === null || totalDeductions === null) {
       const triad = solveMathematicalSalaryTriad(rawText);
       if (triad) {
-        console.log("✓ Confidence-weighted salary triad selected:", triad);
         if (grossPay === null) grossPay = triad.gross;
         if (totalDeductions === null) totalDeductions = triad.deductions;
         if (netPay === null) netPay = triad.net;

@@ -6,6 +6,7 @@ import { uploadPayslip, type StoredPayslip } from "@/lib/actions/payslips";
 import type { CompanyEmployee } from "@/lib/actions/employees";
 import { parsePayslipAction } from "@/lib/actions/parse-payslip";
 import { ShareWithManagersField } from "@/components/shared/share-with-managers-field";
+import { PayslipLeaveFields } from "@/components/payslips/payslip-leave-fields";
 import { MONTHS, monthLabel } from "@/lib/validations/payslips";
 
 const FIELD_CLASSES =
@@ -37,6 +38,8 @@ export function PayslipUploadForm({
   const [grossPay, setGrossPay] = useState<string>("");
   const [netPay, setNetPay] = useState<string>("");
   const [totalDeductions, setTotalDeductions] = useState<string>("");
+  const [vacationDays, setVacationDays] = useState<string>("");
+  const [sickDays, setSickDays] = useState<string>("");
 
   const isExistingSlip = existingPayslips.some(
     (p) => p.year === year && p.month === month,
@@ -60,6 +63,8 @@ export function PayslipUploadForm({
       setGrossPay("");
       setNetPay("");
       setTotalDeductions("");
+      setVacationDays("");
+      setSickDays("");
       setParseNotice(null);
     }
   }, [state]);
@@ -86,6 +91,8 @@ export function PayslipUploadForm({
           period_year,
           employee_name,
           employee_id,
+          vacation_days,
+          sick_days,
         } = res.data;
 
         const filledFields: string[] = [];
@@ -101,6 +108,14 @@ export function PayslipUploadForm({
         if (total_deductions !== null && total_deductions !== undefined) {
           setTotalDeductions(String(total_deductions));
           filledFields.push(`Deductions: ₪${total_deductions.toLocaleString()}`);
+        }
+        if (vacation_days !== null && vacation_days !== undefined) {
+          setVacationDays(String(vacation_days));
+          filledFields.push(`Vacation: ${vacation_days}d`);
+        }
+        if (sick_days !== null && sick_days !== undefined) {
+          setSickDays(String(sick_days));
+          filledFields.push(`Sick: ${sick_days}d`);
         }
         if (period_month !== null && period_month !== undefined) {
           setMonth(period_month);
@@ -326,6 +341,14 @@ export function PayslipUploadForm({
           />
           <FieldError messages={fieldErrors?.totalDeductions} />
         </div>
+
+        <PayslipLeaveFields
+          vacationDays={vacationDays}
+          sickDays={sickDays}
+          onVacationChange={setVacationDays}
+          onSickChange={setSickDays}
+          disabled={pending || isParsing}
+        />
 
         <ShareWithManagersField disabled={pending} />
       </div>

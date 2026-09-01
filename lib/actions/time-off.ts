@@ -170,7 +170,7 @@ export async function listEmployeeLeaveBalances(
   const types = await listLeaveTypes(companyId);
   if (types.length === 0) return [];
 
-  const [{ data: entitlements }, { data: requests }] = await Promise.all([
+  const [{ data: entitlements }, { data: requests, error: reqError }] = await Promise.all([
     supabase
       .from("leave_entitlements")
       .select("leave_type_id, entitled_days, carried_over_days, adjustment_days, year")
@@ -181,6 +181,11 @@ export async function listEmployeeLeaveBalances(
       .select("leave_type_id, working_days, status, start_date")
       .eq("employee_id", employeeId),
   ]);
+
+  if (reqError) {
+    console.error("Error reading time off requests:", reqError);
+    return [];
+  }
 
   return types.map((type) => {
     const entitlement = (entitlements ?? []).find(
@@ -380,6 +385,7 @@ export async function submitTimeOffRequest(
   } = await supabase.auth.getUser();
   if (!user) return fail("UNAUTHENTICATED", "Your session has expired. Sign in again.");
 
+  let attachmentWarnings = 0;
   for (const file of files) {
     const extension =
       ALLOWED_DOCUMENT_TYPES[file.type as AllowedDocumentType] ?? "bin";
@@ -388,7 +394,10 @@ export async function submitTimeOffRequest(
       contentType: file.type,
       upsert: false,
     });
-    if (upload.error) continue;
+    if (upload.error) {
+      attachmentWarnings++;
+      continue;
+    }
 
     const title = file.name.replace(/\.[^.]+$/, "").slice(0, 160) || "Attachment";
     const { error: attachError } = await supabase.from("time_off_attachments").insert({
@@ -402,6 +411,7 @@ export async function submitTimeOffRequest(
     });
     if (attachError) {
       await supabase.storage.from("time_off").remove([path]);
+      attachmentWarnings++;
     }
   }
 

@@ -87,7 +87,7 @@ export default function CompanySignupPage() {
       }
 
       if (data?.user) {
-        window.location.href = "/dashboard";
+        setIsSuccess(true);
         return;
       }
     } catch {
@@ -417,13 +417,21 @@ export default function CompanySignupPage() {
             />
             <span className="text-xs text-slate-600 leading-relaxed">
               I agree to the{" "}
-              <span className="text-indigo-600 font-semibold underline cursor-pointer hover:text-indigo-800">
+              <Link
+                href="/terms"
+                target="_blank"
+                className="text-indigo-600 font-semibold underline cursor-pointer hover:text-indigo-800"
+              >
                 Terms of Service
-              </span>{" "}
+              </Link>{" "}
               and{" "}
-              <span className="text-indigo-600 font-semibold underline cursor-pointer hover:text-indigo-800">
+              <Link
+                href="/privacy"
+                target="_blank"
+                className="text-indigo-600 font-semibold underline cursor-pointer hover:text-indigo-800"
+              >
                 Privacy Policy
-              </span>
+              </Link>
               .
             </span>
           </label>

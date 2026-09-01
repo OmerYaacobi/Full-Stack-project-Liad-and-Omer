@@ -11,7 +11,9 @@ import {
 } from "@/lib/validations/auth";
 import { z } from "zod";
 
-async function resolveUserFirm(supabase: any, user: any) {
+import type { User } from "@supabase/supabase-js";
+
+async function resolveUserFirm(supabase: Awaited<ReturnType<typeof createClient>>, user: User) {
   // 1. Try finding active firm membership
   const { data: firmMembership } = await supabase
     .from("firm_memberships")
@@ -311,6 +313,7 @@ export async function removeCompany(
 
   revalidatePath("/bookkeeper");
   revalidatePath("/bookkeeper/businesses");
+  revalidatePath(`/bookkeeper/businesses/${parsed.data.companyId}`);
   revalidatePath("/bookkeeper/periods");
   revalidatePath("/dashboard");
   return ok(undefined);

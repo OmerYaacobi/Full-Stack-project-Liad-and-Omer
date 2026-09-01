@@ -59,15 +59,12 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             <Link href="/" className="hover:text-slate-800 transition">
               Home
             </Link>
-            <span className="hover:text-slate-800 transition cursor-pointer">
+            <Link href="/privacy" className="hover:text-slate-800 transition">
               Privacy Policy
-            </span>
-            <span className="hover:text-slate-800 transition cursor-pointer">
+            </Link>
+            <Link href="/terms" className="hover:text-slate-800 transition">
               Terms of Service
-            </span>
-            <span className="hover:text-slate-800 transition cursor-pointer">
-              Support
-            </span>
+            </Link>
           </div>
         </div>
       </footer>
