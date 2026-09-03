@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PayrollPortal — מצגת הגשה</title>
+  <title>PayrollPortal — final presentation</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -13,7 +13,6 @@
       --muted: #94a3b8;
       --accent: #818cf8;
       --accent-2: #34d399;
-      --warn: #fbbf24;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
@@ -35,7 +34,6 @@
     .slide.active { display: flex; }
     h1 { font-size: 2.6rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
     h2 { font-size: 2rem; font-weight: 750; margin-bottom: 1.4rem; }
-    h3 { font-size: 1.05rem; color: var(--accent); font-weight: 700; margin-bottom: 0.4rem; }
     p, li { font-size: 1.15rem; line-height: 1.55; color: var(--text); }
     .muted { color: var(--muted); }
     .kicker {
@@ -46,7 +44,7 @@
       text-transform: uppercase;
       margin-bottom: 0.8rem;
     }
-    ul { padding-inline-start: 1.2rem; }
+    ul, ol { padding-inline-start: 1.2rem; }
     li { margin: 0.45rem 0; }
     .grid { display: grid; gap: 1rem; }
     .g3 { grid-template-columns: 1fr 1fr 1fr; }
@@ -58,9 +56,9 @@
       padding: 1.1rem 1.2rem;
     }
     .card strong { display: block; font-size: 1.05rem; margin-bottom: 0.35rem; }
-    .card p, .card li { font-size: 0.98rem; color: var(--muted); }
+    .card p { font-size: 0.98rem; color: var(--muted); }
     table { width: 100%; border-collapse: collapse; font-size: 1rem; }
-    th, td { text-align: right; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line); }
+    th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line); }
     th { color: var(--accent); font-weight: 650; }
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -115,7 +113,7 @@
       display: none;
       margin-top: 1.4rem;
       padding: 0.8rem 1rem;
-      border-right: 3px solid var(--accent);
+      border-left: 3px solid var(--accent);
       background: #0b1220;
       color: var(--muted);
       font-size: 0.92rem;
@@ -130,7 +128,7 @@
         height: 100vh;
         color: #0f172a;
       }
-      .slide p, .slide li, .card p, .card li { color: #334155; }
+      .slide p, .slide li, .card p { color: #334155; }
       .card, .arch .box { background: #f8fafc; border-color: #cbd5e1; }
       .bar { display: none; }
       .notes { display: block; color: #64748b; background: #f1f5f9; }
@@ -143,215 +141,197 @@
     <section class="slide active">
       <div class="kicker">Internet Technologies · RUNI CS 2026</div>
       <h1>PayrollPortal</h1>
-      <p style="margin-top: 1rem; font-size: 1.4rem;">פורטל שכר והנהלת חשבונות לעסקים קטנים ובינוניים</p>
-      <p class="muted" style="margin-top: 1.6rem;">ליעד פילוסוף ועומר יעקבי</p>
+      <p style="margin-top: 1rem; font-size: 1.4rem;">A payroll portal for bookkeeping firms and their client businesses</p>
+      <p class="muted" style="margin-top: 1.6rem;">Liad Pilosof and Omer Yaacobi</p>
       <p class="muted">Next.js · TypeScript · Supabase · Vercel</p>
-      <div class="notes">פתיחה (~45 שניות): שם המוצר, הקורס, מי אנחנו. אל תיכנסו לדמו עדיין — קודם הבעיה.</div>
+      <div class="notes">~45 seconds. Name, who we are, what it is. No demo yet — start with the problem.</div>
     </section>
 
     <section class="slide">
-      <div class="kicker">הבעיה</div>
-      <h2>השכר כבר מחושב. ההפצה שבורה.</h2>
+      <div class="kicker">The problem</div>
+      <h2>Payroll is already calculated. Sharing it is not.</h2>
       <ul>
-        <li>עובד מבקש תלוש או 106 ב-WhatsApp — והמשרד שולח PDF בודד.</li>
-        <li>מנהל מאשר חופשה באקסל, בלי יתרה ובלי לדעת מי עוד בחופש.</li>
-        <li>אף אחד לא עונה על «כמה נוכה ממני השנה?» בלי תריסר קבצים.</li>
-        <li>משרד עם כמה לקוחות מחזיק תיקיות, בלי הפרדת הרשאות ברורה.</li>
+        <li>An employee asks for a pay slip or Form 106 on WhatsApp — the firm sends PDFs one by one.</li>
+        <li>A manager approves vacation in a spreadsheet, with no leave balance and no view of who else is away.</li>
+        <li>Nobody can answer “how much was deducted from me this year?” without opening a pile of files.</li>
+        <li>A firm that manages several clients keeps separate folders, with no clear permission split.</li>
       </ul>
-      <p class="muted" style="margin-top: 1.2rem;">אנחנו לא מחליפים את תוכנת השכר. אנחנו מחליפים את שרשרת המיילים.</p>
-      <div class="notes">~1 דקה. הדגישו: out of scope = חישוב ברוטו-נטו. in scope = שקיפות + הרשאות.</div>
+      <p class="muted" style="margin-top: 1.2rem;">We do not replace the payroll engine. We replace the email chain.</p>
+      <div class="notes">~1 minute. Out of scope: gross-to-net. In scope: each person sees only what they are allowed to see.</div>
     </section>
 
     <section class="slide">
-      <div class="kicker">משתמשים ולקוח</div>
-      <h2>B2B עם שלושה קהלים</h2>
+      <div class="kicker">Users and customer</div>
+      <h2>The customer is the firm. Three roles inside it.</h2>
       <div class="grid g3">
         <div class="card">
-          <strong>הלקוח: המשרד</strong>
-          <p>פירמת הנהלת חשבונות. מביאה כמה עסקי SMB, מעלה תלושים, מזמינה צוות.</p>
+          <strong>The firm</strong>
+          <p>A bookkeeping practice. It brings several businesses, uploads pay slips, and invites staff.</p>
         </div>
         <div class="card">
-          <strong>עובד / מנהל</strong>
-          <p>משתמשי הקצה של הלקוח. מנהל הוא גם עובד: סביבה אישית + סביבת צוות.</p>
+          <strong>Employee and manager</strong>
+          <p>End users. A manager is also an employee: personal pay, plus a team.</p>
         </div>
         <div class="card">
-          <strong>ה-tenant</strong>
-          <p>כל עסק לקוח הוא חברה נפרדת. המשרד מנהל רבות; עובד רואה רק את שלו.</p>
+          <strong>One company at a time</strong>
+          <p>An employee sees only their company. The firm sees its own clients, not another firm’s.</p>
         </div>
       </div>
-      <div class="notes">~45 שניות. «מי משלם» = המשרד. «מי משתמש» = שלושת התפקידים.</div>
+      <div class="notes">~45 seconds. Customer = the bookkeeping firm. Users = employee, manager, bookkeeper.</div>
     </section>
 
     <section class="slide">
-      <div class="kicker">ערך עסקי</div>
-      <h2>למה זה חוסך כסף וזמן</h2>
+      <div class="kicker">Business value</div>
+      <h2>Why this saves time</h2>
       <ul>
-        <li><span class="tag">למשרד</span> — העלאה מרובה, שידוך לפי ת.ז., פרסום חודש, קישורי הצטרפות.</li>
-        <li><span class="tag">לעובד</span> — שירות עצמי: תלוש, יתרת חופשה, 101, בלי ping למשרד.</li>
-        <li><span class="tag">למנהל</span> — תור אישורים עם יתרה וחפיפה, לוח שנה של מי בחופש.</li>
-        <li><span class="tag">לכולם</span> — פחות טעויות הפצה: טיוטה לא גלויה, שיתוף per-file, תפקיד מההזמנה.</li>
+        <li><span class="tag">Firm</span> — upload many slips at once, suggest a match by ID number, publish a month in one click.</li>
+        <li><span class="tag">Employee</span> — pay slip, leave balance, and Form 101 without messaging the firm.</li>
+        <li><span class="tag">Manager</span> — an approval queue with balances, and a calendar of who is away.</li>
+        <li><span class="tag">Everyone</span> — drafts stay hidden. A manager sees another person’s file only if it is shared. Role comes from the invite.</li>
       </ul>
-      <div class="notes">~1 דקה. חברו כל יתרון ליכולת שבניתם, לא לסיסמה שיווקית.</div>
+      <div class="notes">~1 minute. Each line is something we actually built, not a slogan.</div>
     </section>
 
     <section class="slide">
-      <div class="kicker">המוצר</div>
-      <h2>שלושה בתים, אפליקציה אחת</h2>
+      <div class="kicker">The product</div>
+      <h2>Three screens, one app</h2>
       <div class="grid g3">
         <div class="card">
-          <strong>עובד · /employee</strong>
-          <p>תובנות שכר, יתרות, תלושים, מסמכים, בקשת חופשה, טופס 101, אישור צירוף לצוות.</p>
+          <strong>Employee</strong>
+          <p>Pay summary, leave balances, slips, documents, time-off request, Form 101, accept a team-join ask.</p>
         </div>
         <div class="card">
-          <strong>מנהל · /manager</strong>
-          <p>אותה סביבה אישית, פלוס תור אישורים, צוות בהסכמה, קבצים משותפים, לוח שנה.</p>
+          <strong>Manager</strong>
+          <p>The same personal area, plus approvals, team by consent, shared files, and a calendar.</p>
         </div>
         <div class="card">
-          <strong>משרד · /bookkeeper</strong>
-          <p>כמה עסקים, תקופות draft→publish, פענוח PDF, מסמכי HR, אישור כשאין מנהל קו.</p>
+          <strong>Bookkeeper</strong>
+          <p>Several businesses, draft then publish a month, PDF parse, documents, and leave approval when no manager is there.</p>
         </div>
       </div>
-      <div class="notes">כאן דמו קצר אם הזמן מאפשר (2–3 דקות): פרסום חודש אצל המשרד → רענון אצל העובד. אחרת — המשך ארכיטקטורה ודמו בסוף.</div>
+      <div class="notes">If time allows: a short demo — publish a month as the firm, then show what the employee sees. Otherwise demo at the end.</div>
     </section>
 
     <section class="slide">
-      <div class="kicker">ארכיטקטורה</div>
-      <h2>RSC + Actions מול Postgres עם RLS</h2>
+      <div class="kicker">Architecture</div>
+      <h2>The app runs on the server. Permissions live in the database.</h2>
       <div class="arch">
-        <div class="box">Browser<small>React 19</small></div>
-        <span class="arrow">←</span>
-        <div class="box">Next.js / Vercel<small>RSC · Actions · Routes</small></div>
-        <span class="arrow">←</span>
-        <div class="box">Supabase<small>Auth · Postgres · Storage</small></div>
+        <div class="box">Browser<small>UI</small></div>
+        <span class="arrow">→</span>
+        <div class="box">Next.js on Vercel<small>Pages and form writes</small></div>
+        <span class="arrow">→</span>
+        <div class="box">Supabase<small>Auth, data, files</small></div>
       </div>
       <ul>
-        <li>קריאות שכר ב-<strong>Server Components</strong> — לא ב-JS של הדפדפן.</li>
-        <li>כתיבות ב-<strong>Server Actions</strong> + Zod. אין REST CRUD ציבורי.</li>
-        <li>מצבי workflow ב-<strong>RPC</strong> עם נעילת שורה (חופשה, פרסום, צוות).</li>
-        <li>קבצים בבאקטים פרטיים; הורדה ב-URL חתום ל-~120 שניות.</li>
-        <li><code>service_role</code> לא נמצא בקוד. ה-anon key ציבורי במכוון — RLS מחליט.</li>
+        <li>Payroll is loaded <strong>on the server</strong> with the page — not by JavaScript in the browser.</li>
+        <li>Form writes are checked on the server. There is no public table API.</li>
+        <li>Leave approval and month publish run as database functions, so two clicks cannot overwrite each other.</li>
+        <li>Files are private. A download link expires after about two minutes.</li>
+        <li>There is no superuser key in the app. The database decides what each user sees.</li>
       </ul>
-      <div class="notes">~1.5 דקות. המשפט לזכור: «RLS הוא גבול ההרשאה, לא ה-middleware».</div>
+      <div class="notes">~90 seconds. Line to remember: even without our website, an employee using their own login still cannot read someone else’s salary.</div>
     </section>
 
     <section class="slide">
-      <div class="kicker">בסיס הנתונים</div>
-      <h2>Tenant לפי חברה, תפקיד בטבלה</h2>
+      <div class="kicker">Database</div>
+      <h2>Each company has its own data. Role lives in our table.</h2>
       <table>
         <thead>
-          <tr><th>אזור</th><th>טבלאות</th></tr>
+          <tr><th>Area</th><th>What we store</th></tr>
         </thead>
         <tbody>
-          <tr><td>זהות</td><td><code>profiles</code>, <code>memberships</code>, <code>firm_memberships</code></td></tr>
-          <tr><td>שכר</td><td><code>payroll_periods</code>, <code>payslips</code> — unique לפי עובד+חודש</td></tr>
-          <tr><td>חופשה</td><td>מכסות + בקשות; EXCLUDE gist נגד חפיפה</td></tr>
-          <tr><td>קבצים</td><td><code>documents</code>, צרופות חופשה; שיתוף <code>visible_to_managers</code></td></tr>
-          <tr><td>צוות</td><td><code>team_join_requests</code> — מנהל מבקש, עובד מאשר</td></tr>
+          <tr><td>Who signs in</td><td>A profile, membership in a company, membership in a firm</td></tr>
+          <tr><td>Payroll</td><td>A month and a pay slip. One slip per employee per month</td></tr>
+          <tr><td>Leave</td><td>Entitlements and requests. The database blocks overlapping days</td></tr>
+          <tr><td>Files</td><td>Documents filed to one person. Sharing with managers is per file</td></tr>
+          <tr><td>Team</td><td>A manager asks, the employee accepts</td></tr>
         </tbody>
       </table>
-      <p class="muted" style="margin-top: 1rem;">תפקיד מ-<code>invitations.role</code> ב-trigger. לא מ-<code>user_metadata</code> (המשתמש יכול לשכתב אותו).</p>
-      <div class="notes">~1 דקה. אם שואלים על ER: firm → companies → employees → payslips / time_off.</div>
+      <p class="muted" style="margin-top: 1rem;">Role comes from the invite. The user cannot change it in their profile in the browser.</p>
+      <div class="notes">~1 minute. If they ask how it connects: firm → companies → employees → pay slips and leave.</div>
     </section>
 
     <section class="slide">
-      <div class="kicker">תהליכים מרכזיים</div>
-      <h2>שלושה flows שחייבים לעבוד</h2>
-      <div class="grid g2">
+      <div class="kicker">Core flows</div>
+      <h2>Three things that have to work</h2>
+      <div class="grid g3">
         <div class="card">
-          <strong>1. פרסום חודש</strong>
-          <p>טיוטה → העלאת PDF → פענוח מציע עובד → אדם מאשר הקצאה → Publish ב-RPC. לפני publish העובד רואה ריק.</p>
+          <strong>1. Publish a month</strong>
+          <p>Draft, upload PDFs, the system suggests an employee, a person confirms, then publish. Before that, the employee sees an empty state.</p>
         </div>
         <div class="card">
-          <strong>2. חופשה</strong>
-          <p>השרת מחשב ימי עבודה. pending צורך יתרה. מנהל או משרד מחליטים. אי אפשר לאשר את עצמך.</p>
+          <strong>2. Time off</strong>
+          <p>The server counts working days. A pending request uses the balance. A manager or the firm decides. You cannot approve your own request.</p>
         </div>
         <div class="card">
-          <strong>3. צירוף לצוות</strong>
-          <p>מנהל מבקש, עובד מאשר. המשרד יכול לשייך מנהל קו ישירות. הסרה מהצוות ≠ סיום העסקה.</p>
-        </div>
-        <div class="card">
-          <strong>הקצאה שגויה = הכשלון הגרוע</strong>
-          <p>שידוך אוטומטי הוא הצעה בלבד. משכורת של אחר גלויה זו תקלה שלא מתקנים ב-UX.</p>
+          <strong>3. Join a team</strong>
+          <p>A manager asks, the employee accepts. The firm can assign a line manager directly. Removing from a team is not termination.</p>
         </div>
       </div>
-      <div class="notes">~1.5 דקות. אם נשאר זמן — דמו של אחד מהשלושה במסך מלא.</div>
+      <div class="notes">~90 seconds. If time remains, show one of these three on screen.</div>
     </section>
 
     <section class="slide">
-      <div class="kicker">בדיקות</div>
-      <h2>מה זה אומר שהמוצר «עובד»</h2>
+      <div class="kicker">Tests</div>
+      <h2>What “it works” means</h2>
       <ul>
-        <li><strong>תהליכים:</strong> E1 פרסום שכר, E2 חופשה עד אישור, E3 צוות בהסכמה.</li>
-        <li><strong>הרשאות:</strong> עובד A לא קורא את B; אין כתיבת שכר לעובד; אין אישור עצמי; אין חציית עסק.</li>
-        <li><strong>קלט רע:</strong> נטו &gt; ברוטו, PDF מזויף, חופשה מעל יתרה / מעל 90 יום — נדחים ב-Zod, לא ב-500.</li>
-        <li><strong>מסד:</strong> unique לתלוש, EXCLUDE לחפיפה, RPC אטומי לפרסום.</li>
+        <li><strong>Flows:</strong> publish a month, time off through approval, join a team — checked by hand.</li>
+        <li><strong>Permissions:</strong> an employee cannot see another’s pay, write payroll, approve themselves, or cross companies.</li>
+        <li><strong>Bad input:</strong> net above gross, a non-PDF file, leave over the balance — rejected without a crash.</li>
+        <li><strong>Math:</strong> working days, pay summaries, and input rules run in <code>npm test</code> (22 tests).</li>
       </ul>
-      <p class="muted" style="margin-top: 1rem;">היום: יומן ידני מתועד. הבא: Vitest על <code>lib/domain</code> + מקרי RLS עם JWT.</p>
-      <div class="notes">~45 שניות. היו כנים: אין עץ tests עדיין; האפיון והיומן הם החוזה, והאוטומציה היא הצעד הבא.</div>
+      <p class="muted" style="margin-top: 1rem;">Still missing: automated browser tests, and automated permission tests against the database.</p>
+      <div class="notes">~45 seconds. Be honest: unit tests exist; the main flows and permissions were manual.</div>
     </section>
 
     <section class="slide">
-      <div class="kicker">סקייל</div>
-      <h2>עשרות–מאות משתמשים, לא מיליונים</h2>
+      <div class="kicker">Scale</div>
+      <h2>Tens to hundreds of users, not millions</h2>
       <div class="grid g2">
         <div class="card">
-          <strong>מה מחזיק</strong>
-          <p>אינדקסים לפי <code>company_id</code> / <code>employee_id</code> / pending. RSC בלי waterfall. תקרת 30 PDF. לוח שנה לפי <code>?month=</code>.</p>
+          <strong>What holds at this size</strong>
+          <p>Indexes by company and employee. Payroll loads on the server. At most 30 PDFs per upload. The calendar is one month at a time.</p>
         </div>
         <div class="card">
-          <strong>מה יישבר קודם</strong>
-          <p>ארון מסמכים של כל הפירמה בלי pagination. פענוח PDF סינכרוני מול timeout של Vercel.</p>
+          <strong>What breaks first</strong>
+          <p>The firm-wide document cabinet with no pages. Heavy PDF parsing in the same request as the upload.</p>
         </div>
       </div>
-      <p style="margin-top: 1.1rem;">עובד שנכנס לתלוש שלו = כמה שורות ממנוכסות. זה לא העומס. העומס הוא המשרד שמעלה ומציג הכל בבת אחת.</p>
-      <div class="notes">~1 דקה. «אינדקס + RLS lookup ≠ seq scan על כל התלושים».</div>
+      <p style="margin-top: 1.1rem;">An employee opening their own slip reads a few of their rows. That is not the load. The load is the firm uploading and listing everything at once.</p>
+      <div class="notes">~1 minute. Do not say “we are ready for a million.” Say where the real limit is.</div>
     </section>
 
     <section class="slide">
-      <div class="kicker">אבטחה</div>
-      <h2>ארבע שכבות, גבול אחד אמיתי</h2>
+      <div class="kicker">Security</div>
+      <h2>Four layers. The real boundary is the database.</h2>
       <ol>
-        <li><code>proxy.ts</code> — בלי סשן אין אפליקציה.</li>
-        <li><code>requireRole</code> — UX; תוקף שמזמן Action עדיין פוגש את 3–4.</li>
-        <li>Action + Zod — כשל מהיר, הודעה ברורה.</li>
-        <li><strong>RLS + RPC</strong> — גם בלי Next.js, Postgres חוסם.</li>
+        <li>With no session, the private app is closed.</li>
+        <li>The wrong role’s page sends you home (convenience).</li>
+        <li>The server checks input before any write.</li>
+        <li><strong>The database</strong> — even without our website, an employee cannot see someone else’s salary.</li>
       </ol>
-      <p style="margin-top: 1rem;">תפקיד ב-<code>memberships</code>, לא ב-JWT שהמשתמש כותב. קבצים פרטיים. אין <code>service_role</code> ב-env הציבורי.</p>
-      <p class="muted">נשאר: קישור מנהל שדלף, בלי 2FA למשרד, בלי rate limit, בלי סויטת RLS ב-CI.</p>
-      <div class="notes">~1.5 דקות. אם שואלים שאלה אחת — תפקיד ב-user_metadata. זה הסיפור החזק.</div>
+      <p style="margin-top: 1rem;">Role lives in our table, not in a field the user can edit. Files are private. No superuser key in the app.</p>
+      <p class="muted">Still open: a leaked manager invite link, no two-factor for the firm, no rate limit on login.</p>
+      <div class="notes">~90 seconds. If they ask one question: why role is not in user-editablex profile metadata. That is the strong story.</div>
     </section>
 
     <section class="slide">
-      <div class="kicker">אם היה עוד זמן</div>
-      <h2>מה היינו משפרים</h2>
-      <ul>
-        <li>Vitest ל-domain + Playwright ל-E1–E3 + בדיקות RLS ב-CI.</li>
-        <li>Pagination לארון המסמכים ולתור הפירמה; תור רקע לפענוח PDF.</li>
-        <li>מייל / התראות למנהל שמחכה בקשה — היום רק רענון דף.</li>
-        <li>2FA למשרד, מדיניות סיסמה חזקה יותר, CSP headers.</li>
-        <li>ממשק עברית RTL — המשתמשים דוברים עברית, הכרום באנגלית.</li>
-        <li>לא ב-v1 במכוון: חישוב שכר, רשות המסים, צבירת חופשה אוטומטית.</li>
-      </ul>
-      <div class="notes">~45 שניות. שמרו על «קטן, ברור, מאובטח» — זו שורת הקורס.</div>
-    </section>
-
-    <section class="slide">
-      <div class="kicker">הגשה</div>
-      <h1>תודה</h1>
+      <div class="kicker">Close</div>
+      <h1>Thanks</h1>
       <p style="margin-top: 1.2rem;">GitHub: <code>LiadPilosof/Full-Stack-project-Liad-and-Omer</code></p>
-      <p class="muted" style="margin-top: 0.4rem;">Vercel: להשלים בהגשה · מסמכים ב-<code>docs/</code></p>
-      <p style="margin-top: 2rem; font-size: 1.2rem;">שאלות — כולל «תראו בקונסול ש-role ב-metadata לא עוזר».</p>
-      <div class="notes">סגירה: קישור חי, דמו אם עוד לא היה, ואז שאלות. אל תסיימו ב«זהו» בלי URL.</div>
+      <p class="muted" style="margin-top: 0.4rem;">Live app on Vercel · docs in <code>docs/</code></p>
+      <p style="margin-top: 2rem; font-size: 1.2rem;">Questions?</p>
+      <div class="notes">Close with the live URL, a demo if you have not done one yet, then questions.</div>
     </section>
 
   </div>
 
   <div class="bar">
-    <span>PayrollPortal · לחצו → או רווח · N להערות מגיש</span>
+    <span>PayrollPortal · arrows or space · N for speaker notes</span>
     <span>
-      <button type="button" id="prev">הקודם</button>
-      <span id="pos">1 / 13</span>
-      <button type="button" id="next">הבא</button>
+      <button type="button" id="prev">Previous</button>
+      <span id="pos">1 / 12</span>
+      <button type="button" id="next">Next</button>
     </span>
   </div>
 

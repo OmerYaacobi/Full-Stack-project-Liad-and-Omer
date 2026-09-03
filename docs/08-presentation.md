@@ -1,128 +1,150 @@
-# מצגת פרויקט סיום — PayrollPortal
+# Presentation — PayrollPortal
 
-**קורס:** Internet Technologies, RUNI CS 2026  
-**מגישים:** ליעד פילוסוף ועומר יעקבי  
-**מבנה:** 13 שקפים מתוזמנים להצגה של 10–15 דקות  
-**קובץ שקפים אינטראקטיבי:** [docs/presentation.html](presentation.html) (כולל הערות מגיש במקש `N`)
+**Course:** Internet Technologies, RUNI CS 2026  
+**Presenters:** Liad Pilosof and Omer Yaacobi  
+**Length:** 10–15 minutes, 12 slides  
 
----
+Slides: [presentation.html](presentation.html)  
+Open in a browser. Arrow keys or space to move. Press `N` for speaker notes.
 
-## שקף 1: פתיחה (זמן מומלץ: 45 שניות)
-- **כותרת:** PayrollPortal — פורטל שכר והנהלת חשבונות לעסקים קטנים ובינוניים (SMB)
-- **מגישים:** ליעד פילוסוף ועומר יעקבי
-- **סטאק טכנולוגי:** Next.js 16 (App Router) · TypeScript · Supabase (Postgres, Auth, Storage) · Vercel · Tailwind CSS 4
-- **דברי פתיחה:** הצגת הפרויקט, המטרה הכללית והצורך שלשמו נבנה.
+Use the same names throughout: **employee**, **manager**, **firm** (bookkeeper).
 
 ---
 
-## שקף 2: הבעיה בעולם האמיתי (זמן מומלץ: 1 דקה)
-- **השכר כבר מחושב — אבל ההפצה והשקיפות שבורות לחלוטין:**
-  - עובד מבקש תלוש שכר או טופס 106 בוואטסאפ או במייל.
-  - מנהל מאשר ימי חופשה בטבלאות אקסל, בלי לדעת מה היתרה העדכנית ובלי לדעת מי עוד בצוות בחופש.
-  - אף עובד לא יכול לענות על שאלות בסיסיות ("כמה נוכה ממני השנה?") בלי לפתוח תריסר קבצי PDF בודדים.
-  - משרד הנהלת חשבונות שמנהל מספר עסקים מחזיק תיקיות ידניות בלי הפרדת הרשאות ברורה ומאובטחת.
-- **היקף הפרויקט (Scope):** אנחנו לא מחליפים את מנוע חישוב השכר; אנחנו מחליפים את שרשרת המיילים והוואטסאפים בפורטל שירות עצמי מאובטח.
+## 1. Opening — 45 seconds
+
+PayrollPortal. A payroll portal for bookkeeping firms and their client businesses.  
+Liad Pilosof and Omer Yaacobi.  
+Next.js, TypeScript, Supabase, Vercel.
+
+No demo yet. Start with the problem.
 
 ---
 
-## שקף 3: משתמשים ולקוח — מודל B2B (זמן מומלץ: 45 שניות)
-- **הלקוח המשלם:** משרד הנהלת החשבונות (Bookkeeping Firm) שמנהל פורטפוליו של עסקים.
-- **משתמשי הקצה:** עובדים ומנהלים בכל עסק לקוח.
-- **מבנה ה-Multi-Tenancy:**
-  - פירמת הנהלת חשבונות (`bookkeeping_firms`) מנהלת מספר חברות (`companies`).
-  - כל עסק הוא Tenant מבודד עם חברי צוות, תלושים, יתרות ומסמכים משלו.
-  - עובד שייך אך ורק לעסק שלו; מנהל חשבונות מנהל את כל העסקים שתחת הפירמה שלו.
+## 2. The problem — 1 minute
+
+Payroll is already calculated at the firm. What breaks is everything after that:
+
+- An employee asks for a pay slip or Form 106 on WhatsApp, and the firm sends PDFs one by one.
+- A manager approves vacation in a spreadsheet, with no balance and no view of who else is away.
+- Nobody can answer “how much was deducted from me this year?” without opening a pile of files.
+- A firm with several clients keeps folders, with no clear permission split.
+
+We do not replace the payroll engine. We replace the email chain.
 
 ---
 
-## שקף 4: ערך עסקי (זמן מומלץ: 1 דקה)
-- **למשרד רואי החשבון:** העלאה מרובה של קבצי PDF, חילוץ פרטים אוטומטי, שידוך מוצע לפי ת.ז./מספר עובד, פרסום תקופת שכר בלחיצה, קישורי הצטרפות רב-פעמיים.
-- **לעובד:** שירות עצמי 24/7 — צפייה בתלושים, מעקב אחרי יתרות חופשה ומחלה, העלאת טופס 101, הגשת בקשות חופשה ישירות.
-- **למנהל:** תור אישורי חופשה עם יתרה עדכנית, זיהוי חפיפות בין עובדים בצוות, ולוח שנה חודשי ויזואלי.
-- **אבטחה ודיוק:** תלוש בטיוטה לעולם אינו חשוף לעובד; שיתוף קבצים עם מנהלים נשלט ברמת הקובץ (`visible_to_managers`).
+## 3. Users and customer — 45 seconds
+
+The customer is **the firm**. It brings several businesses, uploads slips, and invites staff.
+
+The users are employee, manager, and bookkeeper.  
+A manager is also an employee — personal pay, plus a team.  
+An employee sees only their company. The firm sees its own clients, not another firm’s.
 
 ---
 
-## שקף 5: המוצר — שלושה תפקידים במערכת אחת (זמן מומלץ: 1.5 דקות)
-1. **עובד (`/employee`):** דשבורד תובנות שכר (ממוצע 12 חודשים, יחס ניכויים), כרטיס יתרות חופשה ומחלה, תיק מסמכים אישי, טופס 101 דיגיטלי.
-2. **מנהל (`/manager`):** דשבורד אישי + סקירת צוות, אישור/דחיית בקשות חופשה, לוח שנה של נעדרויות הצוות.
-3. **מנהל חשבונות (`/bookkeeper`):** ניהול עסקים, פתיחת תקופות שכר, העלאת תלושים חכמה (Smart Batch Upload) עם זיהוי כפילויות, אישור בקשות חופשה בעסקים ללא מנהל קו, וניהול יתרות ישיר.
+## 4. Business value — 1 minute
+
+- **Firm:** many slips at once, a suggested match by ID number, publish a month in one click.
+- **Employee:** slip, leave balance, and Form 101 without messaging the firm.
+- **Manager:** an approval queue with balances, and a calendar of who is away.
+- **Everyone:** drafts stay hidden. A manager sees another person’s file only if it is shared. Role comes from the invite.
 
 ---
 
-## שקף 6: ארכיטקטורת התוכנה (זמן מומלץ: 1.5 דקות)
-```
-[Browser / React 19] <---> [Next.js 16 App Router (RSC & Server Actions)] <---> [Supabase (Postgres + RLS + Storage)]
-```
-- **React Server Components (RSC):** כל נתוני השכר הרגישים נשלפים ומרונדרים בשרת — שום נתון שכר גולמי אינו נשלף ב-JS bundle בצד הלקוח.
-- **Server Actions + Zod:** כל פעולת כתיבה/מוטציה עוברת ולידציה כפולה והרשאות בשרת.
-- **RPCs אטומיים:** פעולות קריטיות (פרסום חודש, אישור חופשה, צירוף צוות) רצות בטרנזקציות אטומיות עם נעילת שורות (`FOR UPDATE`).
-- **Private Storage Buckets:** כל קבצי ה-PDF נשמרים בבאקטים פרטיים; הורדה מתבצעת אך ורק דרך Signed URLs עם תוקף קצר של 120 שניות.
-- **עקרון Zero Trust:** מפתח ה-Anon ציבורי לחלוטין במכוון; מסד הנתונים מגן על עצמו באמצעות מדיניות Postgres Row Level Security (RLS).
+## 5. The product — 90 seconds
+
+Three screens, one app:
+
+- **Employee** — pay summary, balances, slips, documents, time off, Form 101.
+- **Manager** — the same personal area, plus approvals, team by consent, shared files, calendar.
+- **Bookkeeper** — several businesses, draft then publish a month, PDF parse, and leave approval when no manager is there.
+
+If there is time: a short demo — publish as the firm, then show what the employee sees.
 
 ---
 
-## שקף 7: מבנה בסיס הנתונים (זמן מומלץ: 1 דקה)
-- **הפרדת זהויות:** `profiles` (זהות המשתמש ב-Auth) מופרדת מ-`employees` (רשומת ה-HR של העסק).
-- **הרשאות מבוססות טבלאות:** התפקיד שמור אך ורק ב-`memberships.role` ו-`firm_memberships` (לעולם לא ב-`user_metadata` שמשתמש קצה יכול לשנות).
-- **דיוק כספי:** עמודות כספיות מוגדרות כ-`numeric(12,2)`.
-- **מניעת חפיפות מובנית:** אינדקס `btree_gist` ו-`EXCLUDE` constraint במסד למניעת חפיפת בקשות חופשה פעילות.
-- **סיווג קבצים:** טבלת `documents` תומכת ב-7 סוגי מסמכים ישראליים + שיתוף מנהלים.
+## 6. Architecture — 90 seconds
+
+Browser → the app on Vercel → Supabase (auth, data, files).
+
+- Payroll loads on the server with the page, not in browser JavaScript.
+- Form writes are checked on the server. There is no public table API.
+- Leave approval and month publish run in the database, so two clicks cannot overwrite each other.
+- Files are private. Download links expire after about two minutes.
+- No superuser key in the app. The database decides what each user sees.
+
+Line to remember: even without our website, an employee using their own login still cannot read someone else’s salary.
 
 ---
 
-## שקף 8: תהליכים מרכזיים (זמן מומלץ: 1.5 דקות)
-1. **פרסום תקופת שכר:** פתיחת תקופת Draft -> העלאת תלושים -> פענוח PDF והצעת שידוך לפי ת.ז. -> אישור אנושי -> הפעלת RPC לפרסום -> חשיפה מיידית לעובדים.
-2. **מחזור חיים של בקשת חופשה:** בדיקת ימי עבודה (ללא שישי-שבת וחגים) -> הגשת בקשה בסטטוס `pending` -> שריון יתרה מיידי -> אישור/דחייה על ידי מנהל/משרד -> עדכון יתרה סופי ולוח שנה.
-3. **צירוף עובד לצוות בהסכמה:** מנהל שולח בקשת צירוף -> העובד מאשר בדשבורד שלו -> עדכון `manager_id`.
+## 7. Database — 1 minute
+
+- Who signs in: a profile, membership in a company, membership in a firm.
+- Payroll: a month and a slip — one slip per employee per month.
+- Leave: entitlements and requests. The database blocks overlapping days.
+- Files filed to one person. Sharing with managers is per file.
+- Team: a manager asks, the employee accepts.
+
+Role comes from the invite. The user cannot change it in their profile in the browser.
+
+If they ask how it connects: firm → companies → employees → pay slips and leave.
 
 ---
 
-## שקף 9: אפיון ומימוש בדיקות (זמן מומלץ: 1 דקה)
-- **סוויטת בדיקות יחידה אוטומטית (`npm test`):**
-  - חישוב ימי עבודה ישראליים (דילוג על שישי ושבת, ניכוי חגים וערבי חג).
-  - חישובי תובנות שכר (ממוצע מתגלגל 12 חודשים, יחס ניכויים, ניתוח תנודתיות).
-  - ולידציות Zod (דחיית סיסמאות לא תואמות, שכר נטו הגבוה מברוטו, תאריכי סוף שגויים).
-  - אלגוריתם שידוך עובדים לפי ת.ז. ישראלית ומספר עובד.
-  - 20 מתוך 20 בדיקות עוברות בהצלחה מלאה (100% Pass).
-- **בדיקות הרשאות RLS ותהליכים ידניים:** E1–E4 מתועדים במלואם ב-[05-test-report.md](05-test-report.md).
+## 8. Core flows — 90 seconds
+
+1. **Publish a month** — draft, upload, suggested match, human confirm, publish. Before that the employee sees empty.
+2. **Time off** — the server counts working days. Pending uses the balance. A manager or the firm decides. You cannot approve yourself.
+3. **Team** — a manager asks, the employee accepts. Removing from a team is not termination.
 
 ---
 
-## שקף 10: סקייל ועומסים (זמן מומלץ: 1 דקה)
-- **תמיכה מובנית בעשרות עד מאות משתמשים:**
-  - אינדקסים מלאים על `company_id`, `employee_id`, `profile_id` וסטטוסי `pending`.
-  - קריאות ב-Server Components ללא יצירת Client waterfalls.
-  - הגבלת Batch של תלושים לעד 30 קבצים במקביל.
-  - חיתוך לוח השנה לחודש ספציפי (`?month=`) למניעת שליפות ענק.
-- **צווארי בקבוק עתידיים ופתרונות:**
-  - הוספת Pagination לארון המסמכים של הפירמה.
-  - העברת פענוח PDF לתור רקע (Background Worker) בארגונים עם מאות עובדים.
+## 9. Tests — 45 seconds
+
+The product works if:
+
+- Publish, time off, and join-a-team succeed (checked by hand).
+- An employee cannot see another’s pay, write payroll, or approve themselves.
+- Bad input is rejected without a crash.
+- Working days, pay summaries, and input rules run in `npm test` — 22 tests.
+
+Missing: automated browser tests, and automated permission tests against the database. Say that plainly.
 
 ---
 
-## שקף 11: אבטחה בסיסית ומתקדמת (זמן מומלץ: 1.5 דקות)
-- **4 שכבות הגנה:**
-  1. `proxy.ts` — חסימת נתיבים מוגנים ללא סשן פעיל.
-  2. `requireRole` ב-Layouts — ניתוב משתמשים לממשק הייעודי שלהם.
-  3. Server Actions + Zod — ולידציית קלט קפדנית בצד השרת.
-  4. **Postgres RLS (Row Level Security)** — שכבת ההגנה האבסולוטית: גם בפנייה ישירה למסד עם ה-Anon Key, עובד לעולם אינו יכול לגשת לנתוני שכר של עובד אחר.
-- **הגנה קריטית:** התפקיד לעולם אינו נקרא מ-`user_metadata` שניתן לעריכה על ידי המשתמש.
-- **קבצים מאובטחים:** באקטים פרטיים, קישורים חתומים לזמן קצר, בדיקת Magic Bytes של קבצי PDF.
+## 10. Scale — 1 minute
+
+Tens to hundreds of users, not millions.
+
+What holds: indexes by company and employee, payroll on the server, at most 30 PDFs, calendar by month.
+
+What breaks first: the firm-wide document cabinet, and heavy PDF parsing in the same request.
+
+An employee opening their own slip is cheap. The load is the firm uploading and listing everything at once.
 
 ---
 
-## שקף 12: מה היינו משפרים בעתיד (זמן מומלץ: 45 שניות)
-- הרחבת הבדיקות ל-Playwright E2E בסביבת CI/CD מלאה.
-- הוספת התראות מייל ו-Push למנהלים בעת הגשת בקשת חופשה.
-- תמיכה ב-2FA (Two-Factor Authentication) עבור מנהלי חשבונות.
-- תמיכה מלאה בריבוי שפות (i18n) עם כיווניות RTL/LTR דינמית.
+## 11. Security — 90 seconds
+
+Four layers. The real boundary is the database:
+
+1. No session, no private app.
+2. The wrong role’s page sends you home.
+3. The server checks input.
+4. The database — even without our website, an employee cannot see someone else’s salary.
+
+Role lives in our table, not in a field the user can edit.  
+Still open: a leaked manager invite link, no two-factor for the firm.
+
+If they ask one question: why role is not in user-editable profile metadata. That is the strong story.
 
 ---
 
-## שקף 13: סיום ושאלות (זמן מומלץ: 1 דקה)
-- **קישור לריפו:** `https://github.com/LiadPilosof/Full-Stack-project-Liad-and-Omer`
-- **קישור לפריסה:** Vercel Production Deployment
-- **תיעוד מלא:** כל מסמכי ההגשה נמצאים בתיקיית `docs/`.
-- **פתיחה לשאלות ובדיקת קוד חיה מול הבוחנים.**
+## 12. Close — 1 minute
 
+GitHub: `LiadPilosof/Full-Stack-project-Liad-and-Omer`  
+Live app on Vercel. Docs in `docs/`.
+
+Live URL, a demo if you have not done one yet, then questions.
