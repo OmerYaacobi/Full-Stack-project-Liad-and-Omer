@@ -142,3 +142,32 @@ export const createInvitationSchema = z.object({
 });
 
 export type CreateInvitationInput = z.input<typeof createInvitationSchema>;
+
+// 5. Password Reset Request - Email Schema
+export const forgotPasswordEmailSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .pipe(z.email("Enter a valid email address.")),
+});
+
+export type ForgotPasswordEmailInput = z.infer<typeof forgotPasswordEmailSchema>;
+
+// 6. Update Password Schema
+export const updatePasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(6, { message: "Password must be at least 6 characters" }),
+    confirmPassword: z
+      .string()
+      .min(6, { message: "Confirm password must be at least 6 characters" }),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;
+

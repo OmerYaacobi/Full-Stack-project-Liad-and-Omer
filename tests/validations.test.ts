@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import {
   loginSchema,
   bookkeeperSignupSchema,
+  forgotPasswordEmailSchema,
+  updatePasswordSchema,
 } from "@/lib/validations/auth";
 import {
   previewTimeOffSchema,
@@ -129,3 +131,35 @@ test("uploadPayslipSchema enforces netPay <= grossPay and valid dates", () => {
 
   assert.equal(monthLabel(5), "May (5)");
 });
+
+test("forgotPasswordEmailSchema validates email format", () => {
+  const valid = forgotPasswordEmailSchema.safeParse({ email: "user@example.com" });
+  assert.equal(valid.success, true);
+  if (valid.success) {
+    assert.equal(valid.data.email, "user@example.com");
+  }
+
+  const invalid = forgotPasswordEmailSchema.safeParse({ email: "invalid-email" });
+  assert.equal(invalid.success, false);
+});
+
+test("updatePasswordSchema requires matching passwords of min 6 chars", () => {
+  const valid = updatePasswordSchema.safeParse({
+    password: "newpassword123",
+    confirmPassword: "newpassword123",
+  });
+  assert.equal(valid.success, true);
+
+  const mismatch = updatePasswordSchema.safeParse({
+    password: "newpassword123",
+    confirmPassword: "differentpassword",
+  });
+  assert.equal(mismatch.success, false);
+
+  const tooShort = updatePasswordSchema.safeParse({
+    password: "123",
+    confirmPassword: "123",
+  });
+  assert.equal(tooShort.success, false);
+});
+

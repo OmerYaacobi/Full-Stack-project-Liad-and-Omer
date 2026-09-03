@@ -184,7 +184,6 @@ export async function createBusiness(input: CreateBusinessInput) {
 
   revalidatePath("/bookkeeper");
   revalidatePath("/bookkeeper/businesses");
-  revalidatePath("/dashboard");
   revalidatePath(`/bookkeeper/businesses/${company.id}`);
 
   const join = await getOrCreateCompanyJoinLink(company.id);
@@ -315,6 +314,5 @@ export async function removeCompany(
   revalidatePath("/bookkeeper/businesses");
   revalidatePath(`/bookkeeper/businesses/${parsed.data.companyId}`);
   revalidatePath("/bookkeeper/periods");
-  revalidatePath("/dashboard");
   return ok(undefined);
 }

@@ -58,3 +58,16 @@ export function shortMonthLabel(year: number, month: number): string {
     month: "short",
   }).format(new Date(year, month - 1, 1));
 }
+
+/**
+ * Normalizes phone numbers to standard E.164 format (+972 for local IL numbers).
+ */
+export function formatPhoneE164(phone: string): string {
+  const cleaned = phone.replace(/[\s\-()]/g, "");
+  if (cleaned.startsWith("+")) return cleaned;
+  if (cleaned.startsWith("0")) {
+    return `+972${cleaned.slice(1)}`;
+  }
+  return `+${cleaned}`;
+}
+

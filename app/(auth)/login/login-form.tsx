@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { signIn } from "@/lib/actions/auth";
 
 export function LoginForm({ next }: { next?: string }) {
@@ -46,12 +47,20 @@ export function LoginForm({ next }: { next?: string }) {
       </div>
 
       <div>
-        <label
-          htmlFor="password"
-          className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
-        >
-          Password <span className="text-red-500">*</span>
-        </label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label
+            htmlFor="password"
+            className="block text-xs font-bold uppercase tracking-wider text-slate-700"
+          >
+            Password <span className="text-red-500">*</span>
+          </label>
+          <Link
+            href="/forgot-password"
+            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition"
+          >
+            Forgot password?
+          </Link>
+        </div>
         <input
           id="password"
           name="password"

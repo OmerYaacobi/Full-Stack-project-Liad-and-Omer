@@ -10,6 +10,8 @@ const PUBLIC_PATHS = [
   "/auth",
   "/signup",
   "/invite",
+  "/forgot-password",
+  "/reset-password",
   "/terms",
   "/privacy",
 ];

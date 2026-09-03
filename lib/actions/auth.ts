@@ -3,11 +3,94 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { fail, fromZod, type ActionResult } from "@/lib/actions/result";
+import { fail, fromZod, ok, type ActionResult } from "@/lib/actions/result";
 import { roleHome } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
-import { loginSchema, passwordLoginSchema } from "@/lib/validations/auth";
+import {
+  forgotPasswordEmailSchema,
+  loginSchema,
+  passwordLoginSchema,
+  updatePasswordSchema,
+} from "@/lib/validations/auth";
 import type { AppRole } from "@/types/app";
+
+/**
+ * Requests a password reset link to be delivered via Email / Gmail.
+ */
+export async function requestPasswordResetEmail(
+  _previous: ActionResult<{ email: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ email: string }>> {
+  const parsed = forgotPasswordEmailSchema.safeParse({
+    email: formData.get("email"),
+  });
+  if (!parsed.success) return fromZod(parsed.error);
+
+  const { email } = parsed.data;
+  const callback = new URL("/auth/callback", await siteOrigin());
+  callback.searchParams.set("next", "/reset-password");
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: callback.toString(),
+  });
+
+  if (error && !isUnknownEmail(error.message)) {
+    if (error.status === 429) {
+      return fail(
+        "RATE_LIMITED",
+        "Too many password reset requests. Please wait a minute and try again.",
+      );
+    }
+    return fail(
+      "INTERNAL",
+      error.message || "Could not send password reset email. Please try again.",
+    );
+  }
+
+  return ok({ email });
+}
+
+/**
+ * Updates the user's password once they have an active recovery session.
+ */
+export async function updateUserPassword(
+  _previous: ActionResult<void> | null,
+  formData: FormData,
+): Promise<ActionResult<void>> {
+  const parsed = updatePasswordSchema.safeParse({
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) return fromZod(parsed.error);
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return fail(
+      "UNAUTHENTICATED",
+      "Your password reset session has expired. Please request a new reset link or SMS code.",
+    );
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: parsed.data.password,
+  });
+
+  if (error) {
+    if (error.status === 429) {
+      return fail("RATE_LIMITED", "Too many attempts. Please try again in a moment.");
+    }
+    return fail("INTERNAL", error.message || "Failed to update password. Please try again.");
+  }
+
+  const destination = await landingFor(supabase, user.id);
+  redirect(destination);
+}
 
 /**
  * The sign-in form offers two ways in, chosen by which submit button was used.
