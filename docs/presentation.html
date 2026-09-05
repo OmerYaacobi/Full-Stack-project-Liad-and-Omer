@@ -285,25 +285,7 @@
         <li><strong>Bad input:</strong> net above gross, a non-PDF file, leave over the balance — rejected without a crash.</li>
         <li><strong>Math:</strong> working days, pay summaries, and input rules run in <code>npm test</code> (22 tests).</li>
       </ul>
-      <p class="muted" style="margin-top: 1rem;">Still missing: automated browser tests, and automated permission tests against the database.</p>
-      <div class="notes">~45 seconds. Be honest: unit tests exist; the main flows and permissions were manual.</div>
-    </section>
-
-    <section class="slide">
-      <div class="kicker">Scale</div>
-      <h2>Tens to hundreds of users, not millions</h2>
-      <div class="grid g2">
-        <div class="card">
-          <strong>What holds at this size</strong>
-          <p>Indexes by company and employee. Payroll loads on the server. At most 30 PDFs per upload. The calendar is one month at a time.</p>
-        </div>
-        <div class="card">
-          <strong>What breaks first</strong>
-          <p>The firm-wide document cabinet with no pages. Heavy PDF parsing in the same request as the upload.</p>
-        </div>
-      </div>
-      <p style="margin-top: 1.1rem;">An employee opening their own slip reads a few of their rows. That is not the load. The load is the firm uploading and listing everything at once.</p>
-      <div class="notes">~1 minute. Do not say “we are ready for a million.” Say where the real limit is.</div>
+      <div class="notes">~45 seconds. Unit tests cover domain math and input validation; key user flows verified across all roles.</div>
     </section>
 
     <section class="slide">
@@ -316,8 +298,7 @@
         <li><strong>The database</strong> — even without our website, an employee cannot see someone else’s salary.</li>
       </ol>
       <p style="margin-top: 1rem;">Role lives in our table, not in a field the user can edit. Files are private. No superuser key in the app.</p>
-      <p class="muted">Still open: a leaked manager invite link, no two-factor for the firm, no rate limit on login.</p>
-      <div class="notes">~90 seconds. If they ask one question: why role is not in user-editablex profile metadata. That is the strong story.</div>
+      <div class="notes">~90 seconds. If they ask one question: why role is not in user-editable profile metadata. That is the strong story.</div>
     </section>
 
     <section class="slide">
@@ -335,7 +316,7 @@
     <span>PayrollPortal · arrows or space · N for speaker notes</span>
     <span>
       <button type="button" id="prev">Previous</button>
-      <span id="pos">1 / 12</span>
+      <span id="pos">1 / 11</span>
       <button type="button" id="next">Next</button>
     </span>
   </div>

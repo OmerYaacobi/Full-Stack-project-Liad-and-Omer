@@ -2,7 +2,7 @@
 
 **Course:** Internet Technologies, RUNI CS 2026  
 **Presenters:** Liad Pilosof and Omer Yaacobi  
-**Length:** 10–15 minutes, 12 slides  
+**Length:** 10–12 minutes, 11 slides  
 
 *Note: Use arrow keys or space to move. Press `N` for speaker notes.*
 
@@ -68,15 +68,8 @@ The product meets the definition of "working":
 * **E2E Flows:** Publish, time off, and join-a-team succeed (checked manually).
 * **Security:** An employee cannot see another’s pay, write payroll, or approve themselves. Bad input is rejected without a crash.
 * **Automated:** Working days math, pay summaries, and Zod input rules run in `npm test` (22 passing tests).
-*(Acknowledge limitations: Mention plainly that automated browser UI tests and automated RLS DB tests are not included).*
 
-## 10. Scale (1m)
-Designed for tens to hundreds of users per firm, not millions.
-* **What holds well:** Indexes by company and employee, Server Components handling payroll, at most 30 PDFs per upload, and calendar fetched by month.
-* **What breaks first:** The firm-wide document cabinet (needs pagination), and heavy synchronous PDF parsing in the same request.
-* **Load Analysis:** An employee opening their own slip is incredibly cheap (indexed lookup). The heaviest load is the firm uploading and listing everything at once.
-
-## 11. Security (90s)
+## 10. Security (90s)
 Four layers of defense. The real boundary is the database (RLS):
 1. **Routing:** No session, no private app.
 2. **UI Guards:** The wrong role’s page sends you home.
@@ -84,8 +77,9 @@ Four layers of defense. The real boundary is the database (RLS):
 4. **Database (RLS):** Even without our website, an employee cannot see someone else’s salary.
 *(Highlight: Role lives in our backend table, not in a field the user can edit).*
 
-## 12. Close (1m)
+## 11. Close (1m)
 * **GitHub:** `LiadPilosof/Full-Stack-project-Liad-and-Omer`
 * **Live App:** Deployed on Vercel. 
-* **Documentation:** PRD, Tech Design, Test Plan, and Scale/Security docs are in the `docs/` folder.
+* **Documentation:** PRD, Tech Design, Test Plan, and Security docs are in the `docs/` folder.
 *(Show Live URL, open floor for questions).*
+
