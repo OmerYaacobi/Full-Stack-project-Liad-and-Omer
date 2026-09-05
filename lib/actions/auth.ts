@@ -189,7 +189,7 @@ async function sendMagicLink(
     options: {
       emailRedirectTo: callback.toString(),
       // Accounts are created by the bookkeeper's invite, never by signing in.
-      // See docs/for-liad-role-security.md.
+      // Role lives in memberships, never in user_metadata. See docs/security_doc.md.
       shouldCreateUser: false,
     },
   });

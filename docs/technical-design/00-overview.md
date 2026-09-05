@@ -88,7 +88,7 @@ A person is one `auth.users` row and one `profiles` row globally.
 
 - **Employees and managers** get a `memberships` row per company, with
   `role` as a Postgres enum. The role is taken from the **invitation token**,
-  never from `user_metadata` (see `docs/for-liad-role-security.md`).
+  never from `user_metadata` (see `docs/security_doc.md`).
 - **Bookkeepers** belong to a `bookkeeping_firms` row via `firm_memberships`.
   They are usually *not* on a client payroll, so they do not get the employee
   nav. Client companies hang off `companies.firm_id`.

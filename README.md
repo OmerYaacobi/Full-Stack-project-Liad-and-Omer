@@ -94,7 +94,6 @@ proxy.ts                Session refresh on every request
 supabase/migrations/    Postgres schema, RLS, RPCs (0001–0012)
 docs/
   technical-design/     Architecture, schema, RLS, API, UX
-  for-liad-role-security.md
 ```
 
 Reads happen in Server Components using `lib/supabase/server.ts`, so payroll
@@ -110,14 +109,14 @@ minute talk (arrow keys; `N` toggles speaker notes; print to PDF if needed).
 
 | Assignment | File |
 | --- | --- |
-| אפיון מוצר | [docs/01-product-spec.md](docs/01-product-spec.md) |
-| ארכיטקטורה | [docs/02-architecture.md](docs/02-architecture.md) |
-| תכנון טכני מפורט | [docs/03-technical-plan.md](docs/03-technical-plan.md) |
-| אפיון בדיקות | [docs/04-test-spec.md](docs/04-test-spec.md) |
-| תיעוד בדיקות | [docs/05-test-report.md](docs/05-test-report.md) |
-| סקייל בסיסי | [docs/06-scale.md](docs/06-scale.md) |
-| אבטחה בסיסית | [docs/07-security.md](docs/07-security.md) |
-| מצגת | [docs/presentation.html](docs/presentation.html) |
+| אפיון מוצר | [docs/product_spec.md](docs/product_spec.md) |
+| ארכיטקטורה | [docs/technical_design.md](docs/technical_design.md) |
+| תכנון טכני מפורט | [docs/technical_design_detailed.md](docs/technical_design_detailed.md) |
+| אפיון בדיקות | [docs/test_plan.md](docs/test_plan.md) |
+| תיעוד בדיקות | [docs/test_execution.md](docs/test_execution.md) |
+| סקייל בסיסי | [docs/scale_doc.md](docs/scale_doc.md) |
+| אבטחה בסיסית | [docs/security_doc.md](docs/security_doc.md) |
+| מצגת | [docs/presentation.html](docs/presentation.html) / [docs/presentation_notes.md](docs/presentation_notes.md) |
 
 English technical-design set (schema, RLS, API, UX):
 
@@ -130,7 +129,6 @@ English technical-design set (schema, RLS, API, UX):
 | [Frontend](docs/technical-design/04-frontend.md) | Folder structure, components, state, errors |
 | [Business logic](docs/technical-design/05-business-logic.md) | Salary maths, leave accounting, state machines |
 | [UX](docs/technical-design/06-ux.md) | Screen-by-screen design per role |
-| [Role security](docs/for-liad-role-security.md) | Why role must not live in `user_metadata` |
 
 ## Status
 
