@@ -1,0 +1,60 @@
+import { z } from "zod";
+
+export const MAX_PAYSLIP_BYTES = 10_485_760;
+export const MAX_PAYSLIP_BATCH = 30;
+
+export const MONTHS = [
+  { value: 1, label: "January (1)" },
+  { value: 2, label: "February (2)" },
+  { value: 3, label: "March (3)" },
+  { value: 4, label: "April (4)" },
+  { value: 5, label: "May (5)" },
+  { value: 6, label: "June (6)" },
+  { value: 7, label: "July (7)" },
+  { value: 8, label: "August (8)" },
+  { value: 9, label: "September (9)" },
+  { value: 10, label: "October (10)" },
+  { value: 11, label: "November (11)" },
+  { value: 12, label: "December (12)" },
+] as const;
+
+export function monthLabel(month: number): string {
+  return MONTHS.find((item) => item.value === month)?.label ?? `Month ${month}`;
+}
+
+function optionalDays() {
+  return z
+    .union([z.coerce.number().min(0).max(365), z.literal("")])
+    .optional()
+    .transform((value) => (value === "" || value === undefined ? null : value));
+}
+
+function optionalMoney(message: string) {
+  return z
+    .union([z.coerce.number().min(0, message), z.literal("")])
+    .optional()
+    .transform((value) => (value === "" || value === undefined ? 0 : value));
+}
+
+export const uploadPayslipSchema = z
+  .object({
+    companyId: z.string().uuid("Pick a business first."),
+    employeeId: z.string().uuid("Pick an employee first."),
+    shareWithManagers: z
+      .union([z.literal("on"), z.literal("true"), z.literal(""), z.null()])
+      .optional()
+      .transform((value) => value === "on" || value === "true"),
+    year: z.coerce.number().int().min(2000).max(2100),
+    month: z.coerce.number().int().min(1).max(12),
+    grossPay: optionalMoney("Gross pay cannot be negative."),
+    netPay: optionalMoney("Net pay cannot be negative."),
+    totalDeductions: optionalMoney("Deductions cannot be negative."),
+    vacationDays: optionalDays(),
+    sickDays: optionalDays(),
+  })
+  .refine((data) => data.netPay <= data.grossPay, {
+    message: "Net pay cannot be higher than gross pay.",
+    path: ["netPay"],
+  });
+
+export type UploadPayslipInput = z.infer<typeof uploadPayslipSchema>;

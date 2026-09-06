@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PayrollPortal — final presentation</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --line: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #818cf8;
+      --accent-2: #34d399;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      height: 100%;
+    }
+    .deck { height: 100%; overflow: hidden; }
+    .slide {
+      display: none;
+      height: 100%;
+      padding: 4.5rem 5rem 5.5rem;
+      flex-direction: column;
+      justify-content: center;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .slide.active { display: flex; }
+    h1 { font-size: 2.6rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+    h2 { font-size: 2rem; font-weight: 750; margin-bottom: 1.4rem; }
+    p, li { font-size: 1.15rem; line-height: 1.55; color: var(--text); }
+    .muted { color: var(--muted); }
+    .kicker {
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.8rem;
+    }
+    ul, ol { padding-inline-start: 1.2rem; }
+    li { margin: 0.45rem 0; }
+    .grid { display: grid; gap: 1rem; }
+    .g3 { grid-template-columns: 1fr 1fr 1fr; }
+    .g2 { grid-template-columns: 1fr 1fr; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.1rem 1.2rem;
+    }
+    .card strong { display: block; font-size: 1.05rem; margin-bottom: 0.35rem; }
+    .card p { font-size: 0.98rem; color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; font-size: 1rem; }
+    th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line); }
+    th { color: var(--accent); font-weight: 650; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.92em;
+      background: #0b1220;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+    .arch {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin: 1.2rem 0;
+    }
+    .arch .box {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.85rem 1.1rem;
+      text-align: center;
+      min-width: 9.5rem;
+    }
+    .arch .box small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem; }
+    .arch .arrow { color: var(--accent); font-size: 1.4rem; }
+    .bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.7rem 1.4rem;
+      background: #0b1220;
+      border-top: 1px solid var(--line);
+      font-size: 0.85rem;
+      color: var(--muted);
+      z-index: 2;
+    }
+    .bar button {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.35rem 0.8rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.2s, color 0.2s;
+    }
+    .bar button:hover {
+      background: var(--line);
+      color: var(--text);
+    }
+    .notes {
+      display: none;
+      margin-top: 1.4rem;
+      padding: 0.8rem 1rem;
+      border-left: 3px solid var(--accent);
+      background: #0b1220;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    body.show-notes .notes { display: block; }
+    .tag { color: var(--accent-2); font-weight: 700; }
+    @media print {
+      html, body, .deck { height: auto; background: #fff; color: #0f172a; }
+      .slide {
+        display: flex !important;
+        page-break-after: always;
+        height: 100vh;
+        color: #0f172a;
+      }
+      .slide p, .slide li, .card p { color: #334155; }
+      .card, .arch .box { background: #f8fafc; border-color: #cbd5e1; }
+      .bar { display: none; }
+      .notes { display: block; color: #64748b; background: #f1f5f9; }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck">
+
+    <section class="slide active">
+      <div class="kicker">Internet Technologies · RUNI CS 2026</div>
+      <h1>PayrollPortal</h1>
+      <p style="margin-top: 1rem; font-size: 1.4rem;">A payroll portal for bookkeeping firms and their client businesses</p>
+      <p class="muted" style="margin-top: 1.6rem;">Liad Pilosof and Omer Yaacobi</p>
+      <p class="muted">Next.js · TypeScript · Supabase · Vercel</p>
+      <div class="notes">~45 seconds. Name, who we are, what it is. No demo yet — start with the problem.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">The problem</div>
+      <h2>Payroll is already calculated. Sharing it is not.</h2>
+      <ul>
+        <li>An employee asks for a pay slip or Form 106 on WhatsApp — the firm sends PDFs one by one.</li>
+        <li>A manager approves vacation in a spreadsheet, with no leave balance and no view of who else is away.</li>
+        <li>Nobody can answer “how much was deducted from me this year?” without opening a pile of files.</li>
+        <li>A firm that manages several clients keeps separate folders, with no clear permission split.</li>
+      </ul>
+      <p class="muted" style="margin-top: 1.2rem;">We do not replace the payroll engine. We replace the email chain.</p>
+      <div class="notes">~1 minute. Out of scope: gross-to-net. In scope: each person sees only what they are allowed to see.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Users and customer</div>
+      <h2>The customer is the firm. Three roles inside it.</h2>
+      <div class="grid g3">
+        <div class="card">
+          <strong>The firm</strong>
+          <p>A bookkeeping practice. It brings several businesses, uploads pay slips, and invites staff.</p>
+        </div>
+        <div class="card">
+          <strong>Employee and manager</strong>
+          <p>End users. A manager is also an employee: personal pay, plus a team.</p>
+        </div>
+        <div class="card">
+          <strong>One company at a time</strong>
+          <p>An employee sees only their company. The firm sees its own clients, not another firm’s.</p>
+        </div>
+      </div>
+      <div class="notes">~45 seconds. Customer = the bookkeeping firm. Users = employee, manager, bookkeeper.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Business value</div>
+      <h2>Why this saves time</h2>
+      <ul>
+        <li><span class="tag">Firm</span> — upload many slips at once, suggest a match by ID number, publish a month in one click.</li>
+        <li><span class="tag">Employee</span> — pay slip, leave balance, and Form 101 without messaging the firm.</li>
+        <li><span class="tag">Manager</span> — an approval queue with balances, and a calendar of who is away.</li>
+        <li><span class="tag">Everyone</span> — drafts stay hidden. A manager sees another person’s file only if it is shared. Role comes from the invite.</li>
+      </ul>
+      <div class="notes">~1 minute. Each line is something we actually built, not a slogan.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">The product</div>
+      <h2>Three screens, one app</h2>
+      <div class="grid g3">
+        <div class="card">
+          <strong>Employee</strong>
+          <p>Pay summary, leave balances, slips, documents, time-off request, Form 101, accept a team-join ask.</p>
+        </div>
+        <div class="card">
+          <strong>Manager</strong>
+          <p>The same personal area, plus approvals, team by consent, shared files, and a calendar.</p>
+        </div>
+        <div class="card">
+          <strong>Bookkeeper</strong>
+          <p>Several businesses, draft then publish a month, PDF parse, documents, and leave approval when no manager is there.</p>
+        </div>
+      </div>
+      <div class="notes">If time allows: a short demo — publish a month as the firm, then show what the employee sees. Otherwise demo at the end.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Architecture</div>
+      <h2>The app runs on the server. Permissions live in the database.</h2>
+      <div class="arch">
+        <div class="box">Browser<small>UI</small></div>
+        <span class="arrow">→</span>
+        <div class="box">Next.js on Vercel<small>Pages and form writes</small></div>
+        <span class="arrow">→</span>
+        <div class="box">Supabase<small>Auth, data, files</small></div>
+      </div>
+      <ul>
+        <li>Payroll is loaded <strong>on the server</strong> with the page — not by JavaScript in the browser.</li>
+        <li>Form writes are checked on the server. There is no public table API.</li>
+        <li>Leave approval and month publish run as database functions, so two clicks cannot overwrite each other.</li>
+        <li>Files are private. A download link expires after about two minutes.</li>
+        <li>There is no superuser key in the app. The database decides what each user sees.</li>
+      </ul>
+      <div class="notes">~90 seconds. Line to remember: even without our website, an employee using their own login still cannot read someone else’s salary.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Database</div>
+      <h2>Each company has its own data. Role lives in our table.</h2>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>What we store</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Who signs in</td><td>A profile, membership in a company, membership in a firm</td></tr>
+          <tr><td>Payroll</td><td>A month and a pay slip. One slip per employee per month</td></tr>
+          <tr><td>Leave</td><td>Entitlements and requests. The database blocks overlapping days</td></tr>
+          <tr><td>Files</td><td>Documents filed to one person. Sharing with managers is per file</td></tr>
+          <tr><td>Team</td><td>A manager asks, the employee accepts</td></tr>
+        </tbody>
+      </table>
+      <p class="muted" style="margin-top: 1rem;">Role comes from the invite. The user cannot change it in their profile in the browser.</p>
+      <div class="notes">~1 minute. If they ask how it connects: firm → companies → employees → pay slips and leave.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Core flows</div>
+      <h2>Three things that have to work</h2>
+      <div class="grid g3">
+        <div class="card">
+          <strong>1. Publish a month</strong>
+          <p>Draft, upload PDFs, the system suggests an employee, a person confirms, then publish. Before that, the employee sees an empty state.</p>
+        </div>
+        <div class="card">
+          <strong>2. Time off</strong>
+          <p>The server counts working days. A pending request uses the balance. A manager or the firm decides. You cannot approve your own request.</p>
+        </div>
+        <div class="card">
+          <strong>3. Join a team</strong>
+          <p>A manager asks, the employee accepts. The firm can assign a line manager directly. Removing from a team is not termination.</p>
+        </div>
+      </div>
+      <div class="notes">~90 seconds. If time remains, show one of these three on screen.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Tests</div>
+      <h2>What “it works” means</h2>
+      <ul>
+        <li><strong>Flows:</strong> publish a month, time off through approval, join a team — checked by hand.</li>
+        <li><strong>Permissions:</strong> an employee cannot see another’s pay, write payroll, approve themselves, or cross companies.</li>
+        <li><strong>Bad input:</strong> net above gross, a non-PDF file, leave over the balance — rejected without a crash.</li>
+        <li><strong>Math:</strong> working days, pay summaries, and input rules run in <code>npm test</code> (22 tests).</li>
+      </ul>
+      <div class="notes">~45 seconds. Unit tests cover domain math and input validation; key user flows verified across all roles.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Security</div>
+      <h2>Four layers. The real boundary is the database.</h2>
+      <ol>
+        <li>With no session, the private app is closed.</li>
+        <li>The wrong role’s page sends you home (convenience).</li>
+        <li>The server checks input before any write.</li>
+        <li><strong>The database</strong> — even without our website, an employee cannot see someone else’s salary.</li>
+      </ol>
+      <p style="margin-top: 1rem;">Role lives in our table, not in a field the user can edit. Files are private. No superuser key in the app.</p>
+      <div class="notes">~90 seconds. If they ask one question: why role is not in user-editable profile metadata. That is the strong story.</div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Close</div>
+      <h1>Thanks</h1>
+      <p style="margin-top: 1.2rem;">GitHub: <code>LiadPilosof/Full-Stack-project-Liad-and-Omer</code></p>
+      <p class="muted" style="margin-top: 0.4rem;">Live app on Vercel · docs in <code>docs/</code></p>
+      <p style="margin-top: 2rem; font-size: 1.2rem;">Questions?</p>
+      <div class="notes">Close with the live URL, a demo if you have not done one yet, then questions.</div>
+    </section>
+
+  </div>
+
+  <div class="bar">
+    <span>PayrollPortal · arrows or space · N for speaker notes</span>
+    <span>
+      <button type="button" id="prev">Previous</button>
+      <span id="pos">1 / 11</span>
+      <button type="button" id="next">Next</button>
+    </span>
+  </div>
+
+  <script>
+    const slides = [...document.querySelectorAll(".slide")];
+    const pos = document.getElementById("pos");
+    let i = 0;
+    function show(n) {
+      i = Math.max(0, Math.min(slides.length - 1, n));
+      slides.forEach((s, idx) => s.classList.toggle("active", idx === i));
+      pos.textContent = i + 1 + " / " + slides.length;
+    }
+    document.getElementById("next").onclick = () => show(i + 1);
+    document.getElementById("prev").onclick = () => show(i - 1);
+    document.addEventListener("keydown", (e) => {
+      if (["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"].includes(e.key)) {
+        e.preventDefault();
+        show(i + 1);
+      }
+      if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(e.key)) {
+        e.preventDefault();
+        show(i - 1);
+      }
+      if (e.key === "n" || e.key === "N") {
+        document.body.classList.toggle("show-notes");
+      }
+      if (e.key === "Home") show(0);
+      if (e.key === "End") show(slides.length - 1);
+    });
+  </script>
+</body>
+</html>
